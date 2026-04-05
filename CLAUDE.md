@@ -31,6 +31,7 @@ make test
 cd tests
 pytest . -m "not slow"  # 排除慢速测试
 ```
+测试环境是venv0，执行source /venv0/bin/activate 后执行python脚本
 
 ## 构建与运行
 
@@ -85,6 +86,39 @@ qlib/
 ├── cli/            # 命令行工具 (qrun)
 └── utils/          # 工具函数
 ```
+
+
+## Project Rules (项目规则)
+
+在开发qlib项目时，必须遵守以下规则：
+
+1. **文档索引** (`docs/project_index.md`):
+   - `docs/` 目录下必须有一个 `project_index.md` 文件作为项目所有文档的索引
+   - 新增或修改文档后，必须更新 `project_index.md`
+
+2. **版本号规范**:
+   - 所有的更新方案都要有对应的更新版本号
+   - 版本号格式: `v[主版本].[次版本].[修订号]`
+     - 主版本: 重大架构变更
+     - 次版本: 新功能模块添加
+     - 修订号: Bug修复和优化
+
+3. **优化计划文档** (`docs/xxx_v.aaa_optimize.md`):
+   - 每次优化前需要把优化计划方案写到 `docs/` 目录下
+   - 文档命名格式: `xxx_v.aaa_optimize.md`
+     - `xxx`: 模块名（如: backtest_visualization, data_service）
+     - `aaa`: 版本号（如: 1.1.0）
+   - 优化完成后需要把结果更新到对应文档里
+   - 每次完成后必须更新 `project_index.md`
+
+4. **测试要求**:
+   - 所有的优化、新功能开发都要有对应的测试方案
+   - 测试文档必须覆盖所有的功能和模块
+   - 特别注意以下测试覆盖:
+     - Web端API接口测试
+     - Web端界面交互测试
+     - 数据加载和验证测试
+     - 策略执行测试
 
 ## 约定
 

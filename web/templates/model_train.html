@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}模型训练 - QLib量化投资平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">训练配置</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="train-tab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#data-config" type="button">数据配置</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#model-config" type="button">模型配置</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#train-exec" type="button">训练执行</button>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3">
+                    <div class="tab-pane fade show active" id="data-config">
+                        <form>
+                            <div class="mb-3">
+                                <label class="form-label">开始日期</label>
+                                <input type="date" class="form-control" id="data-start-date" value="2008-01-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">结束日期</label>
+                                <input type="date" class="form-control" id="data-end-date" value="2020-08-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">训练开始日期</label>
+                                <input type="date" class="form-control" id="train-start-date" value="2008-01-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">训练结束日期</label>
+                                <input type="date" class="form-control" id="train-end-date" value="2014-12-31">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">验证开始日期</label>
+                                <input type="date" class="form-control" id="valid-start-date" value="2015-01-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">验证结束日期</label>
+                                <input type="date" class="form-control" id="valid-end-date" value="2016-12-31">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">测试开始日期</label>
+                                <input type="date" class="form-control" id="test-start-date" value="2017-01-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">测试结束日期</label>
+                                <input type="date" class="form-control" id="test-end-date" value="2020-08-01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">市场</label>
+                                <select class="form-select" id="train-market">
+                                    <option value="csi300">沪深300</option>
+                                    <option value="csi500">中证500</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">因子集</label>
+                                <select class="form-select" id="train-factors">
+                                    <option value="Alpha158">Alpha158</option>
+                                    <option value="Alpha360">Alpha360</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade" id="model-config">
+                        <form>
+                            <div class="mb-3">
+                                <label class="form-label">模型类型</label>
+                                <select class="form-select" id="model-type" onchange="updateModelParams()">
+                                    <option value="LGBModel">LightGBM</option>
+                                    <option value="XGBModel">XGBoost</option>
+                                    <option value="CatModel">CatBoost</option>
+                                    <option value="Linear">Linear</option>
+                                    <option value="LSTM">LSTM</option>
+                                    <option value="GRU">GRU</option>
+                                    <option value="Transformer">Transformer</option>
+                                    <option value="ALSTM">ALSTM</option>
+                                    <option value="TCN">TCN</option>
+                                    <option value="TFT">TFT</option>
+                                    <option value="GATs">GATs</option>
+                                    <option value="Localformer">Localformer</option>
+                                    <option value="DoubleEnsemble">DoubleEnsemble</option>
+                                    <option value="TRA">TRA</option>
+                                    <option value="TabNet">TabNet</option>
+                                    <option value="HFLGBModel">HFLGBModel</option>
+                                </select>
+                            </div>
+                            <div id="model-params">
+                                <!-- 模型参数会动态加载 -->
+                            </div>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade" id="train-exec">
+                        <button type="button" class="btn btn-success w-100 mb-3" onclick="startTraining()">开始训练</button>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6>训练进度</h6>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar" id="train-progress" role="progressbar" style="width: 0%">0%</div>
+                                </div>
+                                <div class="mb-3">
+                                    <small id="train-status">等待开始...</small>
+                                </div>
+                                <h6>训练日志</h6>
+                                <div id="train-log" class="bg-dark text-light p-2 rounded" style="height: 200px; overflow-y: scroll; font-family: monospace; font-size: 0.8rem;">
+                                    <!-- 日志输出 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">训练损失曲线</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="train-loss-chart"></canvas>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">验证指标</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="valid-metrics-chart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">特征重要性</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="feature-importance-chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+let currentTrainTaskId = null;
+let modelParamsCache = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    initTrainingCharts();
+    loadModelParams('LGBModel'); // 默认加载LightGBM参数
+});
+
+function updateModelParams() {
+    const modelType = document.getElementById('model-type').value;
+    loadModelParams(modelType);
+}
+
+async function loadModelParams(modelName) {
+    if (modelParamsCache[modelName]) {
+        updateParamsForm(modelParamsCache[modelName]);
+        return;
+    }
+
+    try {
+        const result = await API.get(`/config/schema/${modelName}`);
+
+        if (result) {
+            modelParamsCache[modelName] = result;
+            updateParamsForm(result);
+        }
+    } catch (error) {
+        console.error('Failed to load model params:', error);
+        showAlert('加载模型参数失败', 'danger');
+    }
+}
+
+function updateParamsForm(params) {
+    const container = document.getElementById('model-params');
+    container.innerHTML = '';
+
+    if (Object.keys(params).length === 0) {
+        container.innerHTML = '<p class="text-muted">该模型无需额外参数</p>';
+        return;
+    }
+
+    for (const [key, schema] of Object.entries(params)) {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'mb-3';
+
+        const label = document.createElement('label');
+        label.className = 'form-label';
+        label.textContent = schema.label || key;
+        formGroup.appendChild(label);
+
+        let input;
+        if (schema.type === 'select') {
+            input = document.createElement('select');
+            input.className = 'form-select';
+
+            schema.options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt === schema.default) option.selected = true;
+                input.appendChild(option);
+            });
+        } else if (schema.type === 'bool') {
+            input = document.createElement('select');
+            input.className = 'form-select';
+
+            const trueOption = document.createElement('option');
+            trueOption.value = 'true';
+            trueOption.textContent = '是';
+            if (schema.default) trueOption.selected = true;
+            input.appendChild(trueOption);
+
+            const falseOption = document.createElement('option');
+            falseOption.value = 'false';
+            falseOption.textContent = '否';
+            if (!schema.default) falseOption.selected = true;
+            input.appendChild(falseOption);
+        } else if (schema.type === 'list') {
+            input = document.createElement('input');
+            input.className = 'form-control';
+            input.type = 'text';
+            input.value = Array.isArray(schema.default) ? JSON.stringify(schema.default) : '';
+            input.placeholder = 'JSON数组格式，例如: [64, 64, 64]';
+        } else {
+            input = document.createElement('input');
+            input.className = 'form-control';
+            input.type = schema.type === 'int' || schema.type === 'float' ? 'number' : 'text';
+            input.value = schema.default !== undefined ? schema.default : '';
+
+            if (schema.min !== undefined) input.min = schema.min;
+            if (schema.max !== undefined) input.max = schema.max;
+            if (schema.type === 'float' || schema.type === 'int') {
+                input.step = schema.type === 'float' ? 0.01 : 1;
+            }
+        }
+
+        input.id = `param-${key}`;
+        input.name = key;
+        formGroup.appendChild(input);
+        container.appendChild(formGroup);
+    }
+}
+
+async function startTraining() {
+    const modelType = document.getElementById('model-type').value;
+    const alphaFactors = document.getElementById('train-factors').value;
+
+    // 收集配置数据
+    const config = {
+        qlib_init: {
+            provider_uri: '~/.qlib/qlib_data/cn_data',
+            region: 'cn'
+        },
+        market: document.getElementById('train-market').value,
+        data_handler_config: {
+            start_time: document.getElementById('data-start-date').value,
+            end_time: document.getElementById('data-end-date').value,
+            instruments: document.getElementById('train-market').value,
+            fit_start_time: document.getElementById('train-start-date').value,
+            fit_end_time: document.getElementById('train-end-date').value
+        },
+        task: {
+            dataset: {
+                class: 'DatasetH',
+                module_path: 'qlib.data.dataset',
+                kwargs: {
+                    handler: {
+                        class: alphaFactors,
+                        module_path: 'qlib.contrib.data.handler',
+                        kwargs: {
+                            start_time: document.getElementById('data-start-date').value,
+                            end_time: document.getElementById('data-end-date').value,
+                            instruments: document.getElementById('train-market').value,
+                            fit_start_time: document.getElementById('train-start-date').value,
+                            fit_end_time: document.getElementById('train-end-date').value
+                        }
+                    },
+                    segments: {
+                        train: [
+                            document.getElementById('train-start-date').value,
+                            document.getElementById('train-end-date').value
+                        ],
+                        valid: [
+                            document.getElementById('valid-start-date').value,
+                            document.getElementById('valid-end-date').value
+                        ],
+                        test: [
+                            document.getElementById('test-start-date').value,
+                            document.getElementById('test-end-date').value
+                        ]
+                    }
+                }
+            },
+            model: {
+                class: modelType,
+                module_path: getModelModulePath(modelType),
+                kwargs: collectModelParams()
+            }
+        }
+    };
+
+    try {
+        showAlert('正在创建训练任务...', 'info');
+
+        const result = await API.post('/task', {
+            task_type: 'model_train',
+            config: config,
+            name: `模型训练 - ${modelType}`
+        });
+
+        if (result.success) {
+            currentTrainTaskId = result.task_id;
+            showAlert('任务已创建，正在启动...', 'success');
+
+            const startResult = await API.post(`/task/${currentTrainTaskId}/start`);
+
+            if (startResult.success) {
+                showAlert('模型训练已启动', 'success');
+                monitorTrainingTask(currentTrainTaskId);
+            } else {
+                showAlert('任务启动失败', 'danger');
+            }
+        } else {
+            showAlert('任务创建失败', 'danger');
+        }
+
+    } catch (error) {
+        console.error('Training error:', error);
+        showAlert('模型训练失败: ' + error.message, 'danger');
+    }
+}
+
+function getModelModulePath(modelType) {
+    const paths = {
+        'LGBModel': 'qlib.contrib.model.gbdt',
+        'XGBModel': 'qlib.contrib.model.gbdt',
+        'CatModel': 'qlib.contrib.model.gbdt',
+        'Linear': 'qlib.contrib.model.linear',
+        'LSTM': 'qlib.contrib.model.pytorch_lstm',
+        'GRU': 'qlib.contrib.model.pytorch_gru',
+        'Transformer': 'qlib.contrib.model.pytorch_transformer',
+        'ALSTM': 'qlib.contrib.model.pytorch_alstm',
+        'TCN': 'qlib.contrib.model.pytorch_tcn',
+        'TFT': 'qlib.contrib.model.pytorch_tft',
+        'GATs': 'qlib.contrib.model.pytorch_gats',
+        'Localformer': 'qlib.contrib.model.pytorch_localformer',
+        'DoubleEnsemble': 'qlib.contrib.model.doubleensemble',
+        'TRA': 'qlib.contrib.model.tra',
+        'TabNet': 'qlib.contrib.model.tabnet',
+        'HFLGBModel': 'qlib.contrib.model.hflgb'
+    };
+    return paths[modelType] || 'qlib.contrib.model.gbdt';
+}
+
+function collectModelParams() {
+    const params = {};
+    const inputs = document.querySelectorAll('#model-params input, #model-params select');
+
+    inputs.forEach(input => {
+        const value = input.value;
+        const key = input.name;
+
+        if (input.type === 'number') {
+            params[key] = parseFloat(value);
+        } else if (input.type === 'checkbox') {
+            params[key] = input.checked;
+        } else if (value === 'true') {
+            params[key] = true;
+        } else if (value === 'false') {
+            params[key] = false;
+        } else if (value.startsWith('[')) {
+            // 解析JSON数组
+            try {
+                params[key] = JSON.parse(value);
+            } catch (e) {
+                console.error('Failed to parse array parameter:', e);
+                params[key] = value;
+            }
+        } else {
+            params[key] = value;
+        }
+    });
+
+    return params;
+}
+
+async function monitorTrainingTask(taskId) {
+    const progressBar = document.getElementById('train-progress');
+    const statusText = document.getElementById('train-status');
+    const logDiv = document.getElementById('train-log');
+
+    const interval = setInterval(async () => {
+        try {
+            const statusResult = await API.get(`/task/${taskId}/status`);
+            const logResult = await API.get(`/task/${taskId}/log`);
+
+            if (statusResult.success) {
+                const task = statusResult.task;
+
+                // 更新进度
+                progressBar.style.width = task.progress + '%';
+                progressBar.textContent = task.progress.toFixed(0) + '%';
+
+                // 更新状态
+                statusText.textContent = task.message || '训练中...';
+
+                // 添加日志
+                if (logResult.success && logResult.logs.length > 0) {
+                    logResult.logs.forEach(log => {
+                        // log是数组格式 [level, message]
+                        [level, message] = Array.isArray(log) ? log : ['INFO', String(log)];
+                        const logLine = document.createElement('div');
+                        logLine.className = `text-${level === 'ERROR' ? 'danger' : 'light'}`;
+                        logLine.textContent = `[${level}] ${message}`;
+                        logDiv.appendChild(logLine);
+                        logDiv.scrollTop = logDiv.scrollHeight;
+                    });
+                }
+
+                if (task.status === 'completed') {
+                    clearInterval(interval);
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    statusText.textContent = '训练完成';
+                    showAlert('模型训练完成', 'success');
+
+                    if (task.result) {
+                        displayTrainingResults(task.result);
+                    }
+                } else if (task.status === 'failed') {
+                    clearInterval(interval);
+                    progressBar.classList.remove('progress-bar-animated');
+                    statusText.textContent = '训练失败';
+                    showAlert('模型训练失败: ' + (task.error || '未知错误'), 'danger');
+                } else if (task.status === 'cancelled') {
+                    clearInterval(interval);
+                    progressBar.classList.remove('progress-bar-animated');
+                    statusText.textContent = '训练已取消';
+                    showAlert('模型训练已取消', 'warning');
+                }
+            } else {
+                clearInterval(interval);
+                showAlert('获取任务状态失败', 'danger');
+            }
+        } catch (error) {
+            console.error('Monitor training error:', error);
+            clearInterval(interval);
+        }
+    }, 2000);
+}
+
+function displayTrainingResults(results) {
+    if (results) {
+        // 更新训练指标显示
+        if (results.train_score !== undefined) {
+            showAlert(`训练得分: ${formatNumber(results.train_score, 4)}`, 'success');
+        }
+        if (results.valid_score !== undefined) {
+            showAlert(`验证得分: ${formatNumber(results.valid_score, 4)}`, 'success');
+        }
+        if (results.test_score !== undefined) {
+            showAlert(`测试得分: ${formatNumber(results.test_score, 4)}`, 'success');
+        }
+
+        // 更新特征重要性图表
+        if (results.feature_importance) {
+            const features = Object.keys(results.feature_importance);
+            const importance = Object.values(results.feature_importance);
+            createFeatureImportanceChart('feature-importance-chart', features, importance);
+        }
+
+        // 更新训练历史图表
+        if (results.training_history) {
+            const history = results.training_history;
+            const epochs = history.epochs;
+
+            if (history.train_loss && history.train_loss.length > 0) {
+                const datasets = [{
+                    label: '训练损失',
+                    data: history.train_loss,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    fill: false,
+                    tension: 0.1
+                }];
+
+                if (history.valid_loss && history.valid_loss.length > 0) {
+                    datasets.push({
+                        label: '验证损失',
+                        data: history.valid_loss,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        fill: false,
+                        tension: 0.1
+                    });
+                }
+
+                createLineChart('train-loss-chart', epochs, datasets);
+            }
+
+            if (history.train_score && history.train_score.length > 0) {
+                const datasets = [{
+                    label: '训练分数',
+                    data: history.train_score,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    fill: false,
+                    tension: 0.1
+                }];
+
+                if (history.valid_score && history.valid_score.length > 0) {
+                    datasets.push({
+                        label: '验证分数',
+                        data: history.valid_score,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        fill: false,
+                        tension: 0.1
+                    });
+                }
+
+                createLineChart('valid-metrics-chart', epochs, datasets);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

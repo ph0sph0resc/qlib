@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}回测 - QLib量化投资平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">回测配置</h5>
+            </div>
+            <div class="card-body">
+                <form id="backtest-form">
+                    <div class="mb-3">
+                        <label for="backtest-model" class="form-label">选择模型</label>
+                        <select class="form-select" id="backtest-model" onchange="loadModelInfo()">
+                            <option value="">请选择模型...</option>
+                            <!-- 模型列表会动态加载 -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bt-start-date" class="form-label">回测开始日期</label>
+                        <input type="date" class="form-control" id="bt-start-date" value="2017-01-01">
+                    </div>
+                    <div class="mb-3">
+                        <label for="bt-end-date" class="form-label">回测结束日期</label>
+                        <input type="date" class="form-control" id="bt-end-date" value="2020-08-01">
+                    </div>
+                    <div class="mb-3">
+                        <label for="initial-cash" class="form-label">初始资金 (RMB)</label>
+                        <input type="number" class="form-control" id="initial-cash" value="100000000" step="1000000">
+                    </div>
+                    <div class="mb-3">
+                        <label for="benchmark" class="form-label">基准指数</label>
+                        <input type="text" class="form-control" id="benchmark" value="SH000300">
+                    </div>
+                    <div class="mb-3">
+                        <label for="strategy" class="form-label">策略类型</label>
+                        <select class="form-select" id="strategy">
+                            <option value="TopkDropoutStrategy">TopkDropout</option>
+                            <option value="SoftTopkStrategy">SoftTopk</option>
+                            <option value="EnhancedIndexingStrategy">Enhanced Indexing</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="topk" class="form-label">持仓数量</label>
+                        <input type="number" class="form-control" id="topk" value="50" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="open-cost" class="form-label">买入手续费 (%)</label>
+                        <input type="number" class="form-control" id="open-cost" value="0.05" step="0.01" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="close-cost" class="form-label">卖出手续费 (%)</label>
+                        <input type="number" class="form-control" id="close-cost" value="0.15" step="0.01" min="0">
+                    </div>
+                    <button type="button" class="btn btn-primary w-100" onclick="runBacktest()">运行回测</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">净值曲线</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="portfolio-chart"></canvas>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">关键指标</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="backtest-metrics">
+                    <div class="col-md-3 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">总收益率</h6>
+                                <h5 class="text-primary" id="total-return">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">年化收益率</h6>
+                                <h5 class="text-success" id="annual-return">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">夏普比率</h6>
+                                <h5 class="text-info" id="sharpe-ratio">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">最大回撤</h6>
+                                <h5 class="text-danger" id="max-drawdown">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">回撤曲线</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="drawdown-chart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">交易记录</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>操作</th>
+                                <th>股票</th>
+                                <th>价格</th>
+                                <th>数量</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-records">
+                            <tr>
+                                <td colspan="5" class="text-center">暂无交易记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+let currentBacktestTaskId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadTrainedModels();
+    initBacktestCharts();
+});
+
+async function loadTrainedModels() {
+    try {
+        const result = await API.get('/analysis/list', {
+            task_type: 'model_train',
+            status: 'completed'
+        });
+
+        if (result.success) {
+            const select = document.getElementById('backtest-model');
+            select.innerHTML = '<option value="">请选择模型...</option>';
+
+            result.experiments.forEach(exp => {
+                const option = document.createElement('option');
+                option.value = exp.id;
+                option.textContent = `${exp.name} - ${exp.id.substring(0, 8)}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load models:', error);
+    }
+}
+
+async function loadModelInfo() {
+    const modelId = document.getElementById('backtest-model').value;
+    if (!modelId) return;
+
+    try {
+        const result = await API.get(`/analysis/detail/${modelId}`);
+
+        if (result.success) {
+            const exp = result.experiment;
+            if (exp.results) {
+                // 如果模型有训练结果，可以更新回测配置
+                console.log('Model results:', exp.results);
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load model info:', error);
+    }
+}
+
+async function runBacktest() {
+    const modelId = document.getElementById('backtest-model').value;
+    if (!modelId) {
+        showAlert('请先选择一个模型', 'warning');
+        return;
+    }
+
+    const config = {
+        qlib_init: {
+            provider_uri: '~/.qlib/qlib_data/cn_data',
+            region: 'cn'
+        },
+        backtest_config: {
+            start_time: document.getElementById('bt-start-date').value,
+            end_time: document.getElementById('bt-end-date').value,
+            account: parseFloat(document.getElementById('initial-cash').value),
+            benchmark: document.getElementById('benchmark').value,
+            exchange_kwargs: {
+                open_cost: parseFloat(document.getElementById('open-cost').value) / 100,
+                close_cost: parseFloat(document.getElementById('close-cost').value) / 100
+            },
+            strategy: {
+                type: document.getElementById('strategy').value,
+                topk: parseInt(document.getElementById('topk').value)
+            }
+        },
+        model_id: modelId
+    };
+
+    try {
+        showAlert('正在创建回测任务...', 'info');
+
+        const result = await API.post('/task', {
+            task_type: 'backtest',
+            config: config,
+            name: `回测 - ${document.getElementById('strategy').value}`
+        });
+
+        if (result.success) {
+            currentBacktestTaskId = result.task_id;
+            showAlert('任务已创建，正在启动...', 'success');
+
+            const startResult = await API.post(`/task/${currentBacktestTaskId}/start`);
+
+            if (startResult.success) {
+                showAlert('回测已启动', 'success');
+                monitorBacktestTask(currentBacktestTaskId);
+            } else {
+                showAlert('任务启动失败', 'danger');
+            }
+        } else {
+            showAlert('任务创建失败', 'danger');
+        }
+
+    } catch (error) {
+        console.error('Backtest error:', error);
+        showAlert('回测失败: ' + error.message, 'danger');
+    }
+}
+
+async function monitorBacktestTask(taskId) {
+    const interval = setInterval(async () => {
+        try {
+            const result = await API.get(`/task/${taskId}/status`);
+
+            if (result.success) {
+                const task = result.task;
+
+                if (task.status === 'completed') {
+                    clearInterval(interval);
+                    showAlert('回测完成', 'success');
+                    displayBacktestResults(task.result);
+                } else if (task.status === 'failed') {
+                    clearInterval(interval);
+                    showAlert('回测失败: ' + (task.error || '未知错误'), 'danger');
+                } else if (task.status === 'cancelled') {
+                    clearInterval(interval);
+                    showAlert('回测已取消', 'warning');
+                }
+            } else {
+                clearInterval(interval);
+                showAlert('获取任务状态失败', 'danger');
+            }
+        } catch (error) {
+            console.error('Monitor backtest error:', error);
+            clearInterval(interval);
+        }
+    }, 2000);
+}
+
+function displayBacktestResults(results) {
+    if (!results) {
+        showAlert('没有可用的回测结果', 'warning');
+        return;
+    }
+
+    // 更新关键指标
+    if (results.total_return !== undefined) {
+        document.getElementById('total-return').textContent = formatPercentage(results.total_return);
+    }
+    if (results.annual_return !== undefined) {
+        document.getElementById('annual-return').textContent = formatPercentage(results.annual_return);
+    }
+    if (results.sharpe_ratio !== undefined) {
+        document.getElementById('sharpe-ratio').textContent = formatNumber(results.sharpe_ratio, 2);
+    }
+    if (results.max_drawdown !== undefined) {
+        document.getElementById('max-drawdown').textContent = formatPercentage(results.max_drawdown);
+    }
+
+    // 更新净值曲线
+    if (results.dates && results.portfolio_curve) {
+        createPortfolioChart('portfolio-chart',
+            results.dates,
+            results.portfolio_curve,
+            results.benchmark_curve || null
+        );
+    }
+
+    // 更新回撤曲线
+    if (results.dates && results.drawdown_series) {
+        createDrawdownChart('drawdown-chart', results.dates, results.drawdown_series);
+    }
+
+    // 更新交易记录
+    if (results.trades) {
+        displayTradeRecords(results.trades);
+    }
+
+    showAlert('回测结果已显示', 'success');
+}
+
+function displayTradeRecords(trades) {
+    const tbody = document.getElementById('trade-records');
+
+    if (!trades || trades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无交易记录</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = trades.map(trade => `
+        <tr>
+            <td>${trade.date || '-'}</td>
+            <td>${trade.action || '-'}</td>
+            <td>${trade.stock || '-'}</td>
+            <td>${trade.price ? formatNumber(trade.price, 2) : '-'}</td>
+            <td>${trade.amount || '-'}</td>
+        </tr>
+    `).join('');
+}
+
+function initBacktestCharts() {
+    // 初始化示例图表
+    const dates = ['2020-01', '2020-02', '2020-03', '2020-04', '2020-05', '2020-06'];
+    createPortfolioChart('portfolio-chart', dates, [1.0, 1.05, 1.12, 1.08, 1.15, 1.2], [1.0, 1.02, 1.04, 1.01, 1.05, 1.08]);
+    createDrawdownChart('drawdown-chart', dates, [0, -0.02, 0, -0.04, 0, 0]);
+}
+</script>
+{% endblock %}

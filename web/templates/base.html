@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}QLib量化投资平台{% endblock %}</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">QLib量化平台</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/factor_test">因子测试</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model_train">模型训练</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/backtest">回测</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/analysis">记录分析</a>
+                    </li>
+                </ul>
+                <span class="navbar-text">
+                    <span id="system-status" class="badge bg-success">运行中</span>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="text-center text-muted py-3">
+        <p>QLib量化投资平台 &copy; 2024</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

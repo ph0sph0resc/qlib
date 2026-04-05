@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}因子测试 - QLib量化投资平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">因子配置</h5>
+            </div>
+            <div class="card-body">
+                <form id="factor-form">
+                    <div class="mb-3">
+                        <label for="market" class="form-label">市场</label>
+                        <select class="form-select" id="market">
+                            <option value="csi300">沪深300</option>
+                            <option value="csi500">中证500</option>
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="start-date" class="form-label">开始日期</label>
+                        <input type="date" class="form-control" id="start-date" value="2018-01-01">
+                    </div>
+                    <div class="mb-3">
+                        <label for="end-date" class="form-label">结束日期</label>
+                        <input type="date" class="form-control" id="end-date" value="2020-12-31">
+                    </div>
+                    <div class="mb-3">
+                        <label for="alpha-factors" class="form-label">Alpha因子集</label>
+                        <select class="form-select" id="alpha-factors">
+                            <option value="Alpha158">Alpha158</option>
+                            <option value="Alpha360">Alpha360</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="factor-expression" class="form-label">因子表达式</label>
+                        <textarea class="form-control" id="factor-expression" rows="3" placeholder="例如: Ref($close, -1) / $open - 1">$close</textarea>
+                    </div>
+                    <button type="button" class="btn btn-primary w-100" onclick="runFactorTest()">运行测试</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">IC值时间序列</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="ic-chart"></canvas>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">IC分布</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="ic-dist-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">分组收益</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="group-return-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+let currentTaskId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initFactorTestCharts();
+});
+
+async function runFactorTest() {
+    const market = document.getElementById('market').value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const alphaFactors = document.getElementById('alpha-factors').value;
+    const factorExpression = document.getElementById('factor-expression').value;
+
+    // 构建配置
+    const config = {
+        qlib_init: {
+            provider_uri: '~/.qlib/qlib_data/cn_data',
+            region: 'cn'
+        },
+        market: market,
+        data_handler_config: {
+            start_time: startDate,
+            end_time: endDate,
+            instruments: market
+        },
+        factor_analysis: {
+            expression: factorExpression,
+            alpha_factors: alphaFactors
+        }
+    };
+
+    try {
+        showAlert('正在创建因子测试任务...', 'info');
+
+        // 创建任务
+        const result = await API.post('/task', {
+            task_type: 'factor_test',
+            config: config,
+            name: `因子测试 - ${market} - ${alphaFactors}`
+        });
+
+        if (result.success) {
+            currentTaskId = result.task_id;
+            showAlert('任务已创建，正在启动...', 'success');
+
+            // 启动任务
+            const startResult = await API.post(`/task/${currentTaskId}/start`);
+
+            if (startResult.success) {
+                showAlert('因子测试已启动', 'success');
+                monitorTask(currentTaskId);
+            } else {
+                showAlert('任务启动失败: ' + (startResult.error || '未知错误'), 'danger');
+            }
+        } else {
+            showAlert('任务创建失败: ' + (result.error || '未知错误'), 'danger');
+        }
+
+    } catch (error) {
+        console.error('Factor test error:', error);
+        showAlert('因子测试失败: ' + error.message, 'danger');
+    }
+}
+
+async function monitorTask(taskId) {
+    const interval = setInterval(async () => {
+        try {
+            const result = await API.get(`/task/${taskId}/status`);
+
+            if (result.success) {
+                const task = result.task;
+                console.log('Task status:', task);
+
+                if (task.status === 'completed') {
+                    clearInterval(interval);
+                    showAlert('因子测试完成', 'success');
+                    displayFactorResults(task.result);
+                } else if (task.status === 'failed') {
+                    clearInterval(interval);
+                    showAlert('因子测试失败: ' + (task.error || '未知错误'), 'danger');
+                } else if (task.status === 'cancelled') {
+                    clearInterval(interval);
+                    showAlert('因子测试已取消', 'warning');
+                } else {
+                    // 任务仍在运行
+                }
+            } else {
+                clearInterval(interval);
+                showAlert('获取任务状态失败', 'danger');
+            }
+        } catch (error) {
+            console.error('Monitor task error:', error);
+            clearInterval(interval);
+        }
+    }, 2000); // 每2秒检查一次
+}
+
+function displayFactorResults(results) {
+    if (!results) {
+        showAlert('没有可用的结果', 'warning');
+        return;
+    }
+
+    // 更新IC时间序列图表
+    if (results.ic_values) {
+        const dates = results.dates || Array.from({length: results.ic_values.length}, (_, i) => `Month ${i + 1}`);
+        createLineChart('ic-chart', dates, [{
+            label: 'IC值',
+            data: results.ic_values,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            fill: false,
+            tension: 0.1
+        }]);
+
+        // 更新IC分布
+        if (results.ic_distribution) {
+            createHistogramChart('ic-dist-chart', results.ic_distribution);
+        }
+
+        // 更新分组收益
+        if (results.group_returns) {
+            createBarChart('group-return-chart', ['第1组', '第2组', '第3组', '第4组', '第5组'], [{
+                label: '分组收益 (%)',
+                data: results.group_returns,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(54, 162, 235, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(54, 162, 235, 1)'
+                ],
+                borderWidth: 1
+            }]);
+        }
+    }
+
+    showAlert('因子分析结果：IC均值=' + formatNumber(results.ic_mean || 0, 4) +
+               ', IC标准差=' + formatNumber(results.ic_std || 0, 4), 'success');
+}
+</script>
+{% endblock %}

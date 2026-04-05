@@ -1,0 +1,27 @@
+# Flask Web Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Templates
+Jinja2==3.1.2
+
+# YAML Configuration
+PyYAML==6.0.1
+
+# Database
+SQLAlchemy==2.0.23
+Flask-SQLAlchemy==3.1.1
+
+# QLib (already installed in project)
+# qlib
+
+# Chart.js is static, included directly
+
+# CORS (optional, for API access)
+flask-cors==4.0.0
+
+# Date/Time utilities
+python-dateutil==2.8.2
+
+# Logging
+python-json-logger==2.0.7
