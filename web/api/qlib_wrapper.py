@@ -244,11 +244,14 @@ class QLibWrapper:
             model_kwargs = model_config.get('kwargs', {})
 
             # Estimate total epochs based on model type
-            if model_class in ['LGBModel', 'XGBModel']:
-                num_boost_round = model_kwargs.get('num_boost_round', model_kwargs.get('num_boost_round', 1000))
+            if model_class in ['LGBModel', 'XGBModel', 'CatBoostModel']:
+                num_boost_round = model_kwargs.get('num_boost_round', 1000)
                 total_epochs = num_boost_round
-            elif model_class.startswith('Pytorch'):
-                total_epochs = model_kwargs.get('n_epochs', model_kwargs.get('n_epochs', 100))
+            elif model_class in ['LSTM', 'GRU', 'TransformerModel', 'ALSTM', 'TCN',
+                              'GATs', 'Localformer', 'TRA', 'TabNet']:
+                total_epochs = model_kwargs.get('n_epochs', 100)
+            elif model_class in ['DEnsembleModel']:
+                total_epochs = model_kwargs.get('n_epochs', 10)
             else:
                 total_epochs = 100
 
@@ -484,47 +487,56 @@ class QLibWrapper:
 
     def run_backtest(self, config: Dict, task=None) -> Dict:
         """
-        Run backtest
+        Run backtest using QLib's native backtest API
 
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary containing:
+                - model_id: ID of trained model
+                - backtest_config: Backtest configuration
+                - qlib_init: QLib initialization config
             task: Task object for progress updates
 
         Returns:
-            Backtest results
+            Backtest results in frontend-expected format
         """
-        if task:
-            task.update_progress(10, 'Initializing QLib')
-
-        if not self._initialized:
-            self.init()
-
         try:
             if task:
-                task.update_progress(30, 'Loading model')
+                task.update_progress(5, 'Initializing QLib')
 
-            # Load trained model
+            # Initialize QLib
+            if not self._initialized:
+                self.init()
+
+            # Step 1: Extract configuration
+            model_id = config.get('model_id')
+            if not model_id:
+                raise ValueError("model_id is required for backtest")
+
+            if task:
+                task.update_progress(10, 'Loading trained model')
+
+            # Step 2: Load trained model recorder and prediction
+            recorder = self._load_model_recorder(model_id)
+            pred = recorder.load_object("pred.pkl")
+
+            if task:
+                task.update_progress(30, 'Configuring backtest')
+
+            # Step 3: Build backtest configuration
+            backtest_config = config.get('backtest_config', {})
+            port_analysis_config = self._build_backtest_config(pred, backtest_config)
+
             if task:
                 task.update_progress(50, 'Running backtest')
 
-            # Run backtest
+            # Step 4: Execute backtest
+            backtest_results = self._execute_backtest(recorder, port_analysis_config, task)
+
             if task:
                 task.update_progress(80, 'Analyzing results')
 
-            # Return mock results for now
-            results = {
-                'backtest_id': 'bt_' + str(hash(str(config)) % 10000),
-                'total_return': 0.25,
-                'annual_return': 0.15,
-                'sharpe_ratio': 1.5,
-                'max_drawdown': -0.12,
-                'win_rate': 0.55,
-                'turnover': 0.3,
-                'total_trades': 1000,
-                'portfolio_curve': [1.0, 1.01, 1.02, 1.01, 1.03],
-                'benchmark_curve': [1.0, 1.005, 1.01, 1.008, 1.012],
-                'dates': ['2020-01', '2020-02', '2020-03', '2020-04', '2020-05']
-            }
+            # Step 5: Extract and format results
+            results = self._extract_backtest_results(backtest_results, model_id)
 
             if task:
                 task.update_progress(100, 'Backtest completed')
@@ -532,10 +544,245 @@ class QLibWrapper:
             return results
 
         except Exception as e:
-            logger.error(f'Backtest failed: {e}')
+            logger.error(f'Backtest failed: {e}', exc_info=True)
             if task:
                 task.update_progress(0, f'Backtest failed: {str(e)}')
             raise
+
+    def _load_model_recorder(self, model_id: str) -> Any:
+        """
+        Load recorder from trained model
+
+        Args:
+            model_id: Model ID (can be recorder_id or experiment_id)
+
+        Returns:
+            Recorder object
+        """
+        from qlib.workflow import R
+
+        # Try to load by recorder_id first
+        try:
+            recorder = R.get_recorder(recorder_id=model_id)
+            logger.info(f'Loaded recorder by ID: {model_id}')
+            return recorder
+        except Exception as e:
+            logger.warning(f'Failed to load recorder by ID: {e}')
+
+        # Try to load by experiment_id and get last recorder
+        try:
+            exp = R.get_exp(experiment_id=model_id)
+            recorders = exp.list_recorders()
+            if recorders:
+                recorder = exp.get_recorder(recorder_id=recorders[-1].id)
+                logger.info(f'Loaded last recorder from experiment: {model_id}')
+                return recorder
+        except Exception as e:
+            logger.warning(f'Failed to load from experiment: {e}')
+
+        raise ValueError(f'Cannot load recorder for model_id: {model_id}')
+
+    def _build_backtest_config(self, pred: Any, backtest_config: Dict) -> Dict:
+        """
+        Build backtest configuration for PortAnaRecord
+
+        Args:
+            pred: Prediction data from trained model
+            backtest_config: Backtest configuration from frontend
+
+        Returns:
+            PortAnaRecord configuration
+        """
+        # Extract strategy config
+        strategy_config = backtest_config.get('strategy', {})
+        strategy_type = strategy_config.get('type', 'TopkDropoutStrategy')
+        topk = strategy_config.get('topk', 50)
+        n_drop = strategy_config.get('n_drop', 5)
+
+        # Extract exchange config
+        exchange_kwargs = backtest_config.get('exchange_kwargs', {})
+
+        # Build configuration
+        config = {
+            "executor": {
+                "class": "SimulatorExecutor",
+                "module_path": "qlib.backtest.executor",
+                "kwargs": {
+                    "time_per_step": "day",
+                    "generate_portfolio_metrics": True,
+                },
+            },
+            "strategy": {
+                "class": strategy_type,
+                "module_path": "qlib.contrib.strategy.signal_strategy",
+                "kwargs": {
+                    "signal": pred,
+                    "topk": topk,
+                    "n_drop": n_drop,
+                },
+            },
+            "backtest": {
+                "start_time": backtest_config.get('start_time', '2017-01-01'),
+                "end_time": backtest_config.get('end_time', '2020-08-01'),
+                "account": backtest_config.get('account', 100000000),
+                "benchmark": backtest_config.get('benchmark', 'SH000300'),
+                "exchange_kwargs": {
+                    "freq": "day",
+                    "limit_threshold": exchange_kwargs.get('limit_threshold', 0.095),
+                    "deal_price": "close",
+                    "open_cost": exchange_kwargs.get('open_cost', 0.0005),
+                    "close_cost": exchange_kwargs.get('close_cost', 0.0015),
+                    "min_cost": exchange_kwargs.get('min_cost', 5),
+                },
+            },
+        }
+
+        return config
+
+    def _execute_backtest(self, recorder: Any, port_analysis_config: Dict, task=None) -> Dict:
+        """
+        Execute backtest using PortAnaRecord
+
+        Args:
+            recorder: Recorder object
+            port_analysis_config: Backtest configuration
+            task: Task object for progress updates
+
+        Returns:
+            Dictionary containing backtest artifacts
+        """
+        from qlib.workflow.record_temp import PortAnaRecord
+
+        # Create PortAnaRecord instance
+        par = PortAnaRecord(recorder, config=port_analysis_config)
+
+        # Generate backtest results
+        artifacts = par.generate()
+
+        # Load generated artifacts
+        results = {}
+        for artifact_name, artifact_data in artifacts.items():
+            # Store artifacts in memory
+            results[artifact_name] = artifact_data
+
+        return results
+
+    def _extract_backtest_results(self, backtest_results: Dict, model_id: str) -> Dict:
+        """
+        Extract backtest results in frontend-expected format
+
+        Args:
+            backtest_results: Dictionary containing backtest artifacts
+            model_id: Model ID for backtest_id generation
+
+        Returns:
+            Formatted results dictionary
+        """
+        from qlib.contrib.evaluate import risk_analysis
+
+        # Get report_normal (portfolio metrics)
+        report_normal = backtest_results.get('report_normal_1day.pkl')
+
+        if report_normal is None:
+            raise ValueError("No backtest report found")
+
+        # Calculate portfolio curve
+        account_values = report_normal['account'].values
+        initial_value = account_values[0]
+        portfolio_curve = (account_values / initial_value).tolist()
+
+        # Calculate benchmark curve
+        bench_returns = report_normal['bench'].values
+        benchmark_curve = (1 + bench_returns).cumprod().tolist()
+
+        # Calculate drawdown series
+        portfolio_cumsum = np.cumsum(report_normal['return'].values)
+        portfolio_cummax = portfolio_cumsum.cummax()
+        drawdown_series = (portfolio_cumsum - portfolio_cummax).tolist()
+
+        # Calculate risk metrics using QLib's risk_analysis
+        strategy_returns = report_normal['return']
+        excess_returns = strategy_returns - report_normal['bench']
+
+        risk_metrics = risk_analysis(excess_returns, freq='day')
+
+        # Extract metrics - risk_metrics is a DataFrame with index as metric names
+        annual_return = risk_metrics.loc['annualized_return', 'mean']
+        sharpe_ratio = risk_metrics.loc['information_ratio', 'mean']
+        max_drawdown = risk_metrics.loc['max_drawdown', 'mean']
+
+        # Calculate total return
+        total_return = strategy_returns.sum()
+
+        # Calculate turnover
+        turnover_values = report_normal.get('turnover', pd.Series([0] * len(report_normal)))
+        avg_turnover = turnover_values.mean() if len(turnover_values) > 0 else 0.0
+
+        # Calculate win rate
+        positive_returns = (strategy_returns > 0).sum()
+        win_rate = positive_returns / len(strategy_returns) if len(strategy_returns) > 0 else 0.0
+
+        # Extract trades from positions
+        trades = self._extract_trades_from_positions(
+            backtest_results.get('positions_normal_1day.pkl')
+        )
+
+        # Format dates
+        dates = report_normal.index.strftime('%Y-%m-%d').tolist()
+
+        # Build results dictionary
+        results = {
+            'backtest_id': f'bt_{model_id[:8]}_{hash(str(portfolio_curve[-1])) % 10000}',
+            'total_return': float(total_return),
+            'annual_return': float(annual_return),
+            'sharpe_ratio': float(sharpe_ratio),
+            'max_drawdown': float(-max_drawdown),
+            'win_rate': float(win_rate),
+            'turnover': float(avg_turnover),
+            'total_trades': trades,
+            'portfolio_curve': portfolio_curve,
+            'benchmark_curve': benchmark_curve,
+            'drawdown_series': drawdown_series,
+            'dates': dates
+        }
+
+        return results
+
+    def _extract_trades_from_positions(self, positions: Any) -> List[Dict]:
+        """
+        Extract trade records from positions data
+
+        Args:
+            positions: Position data from backtest
+
+        Returns:
+            List of trade dictionaries
+        """
+        trades = []
+
+        if positions is None:
+            return trades
+
+        try:
+            for date, pos in positions.items():
+                if isinstance(pos, dict) and 'cash' in pos:
+                    # Extract stock positions
+                    stock_positions = {k: v for k, v in pos.items()
+                                           if k != 'cash' and not k.startswith('_')}
+
+                    for stock, amount in stock_positions.items():
+                        if amount > 0:
+                            trades.append({
+                                'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
+                                'action': 'BUY',
+                                'stock': stock,
+                                'price': 0.0,
+                                'amount': amount
+                            })
+        except Exception as e:
+            logger.warning(f'Failed to extract trades: {e}')
+
+        return trades
 
     def get_experiment_results(self, experiment_id: str) -> Dict:
         """

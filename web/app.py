@@ -33,7 +33,7 @@ from api.models import db
 # Import API modules
 from api.qlib_wrapper import qlib
 from api.config_parser import ConfigParser
-from api.task_manager import task_manager
+from api.task_manager import task_manager, TaskStatus
 
 # Initialize Flask app
 app = Flask(__name__,
@@ -51,6 +51,46 @@ CORS(app)
 
 # Initialize database
 db.init_app(app)
+
+
+# ============================================================================
+# Task Status Sync Helper
+# ============================================================================
+
+def update_task_in_db(task):
+    """将任务状态同步到数据库"""
+    try:
+        from api.models import Experiment
+        from datetime import timezone, datetime
+        import json
+
+        logger.info(f'update_task_in_db called - task.id={task.id}, task.status={task.status}, task.progress={task.progress}')
+
+        with app.app_context():
+            experiment = Experiment.query.get(task.id)
+            if experiment:
+                logger.info(f'Before update - db.status={experiment.status}, db.progress={experiment.progress}')
+
+                experiment.status = task.status
+                experiment.progress = task.progress
+                experiment.message = task.message
+
+                if task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED]:
+                    experiment.completed_at = datetime.now(timezone.utc)
+                    logger.info(f'Setting completed_at to {experiment.completed_at}')
+                    if task.result:
+                        experiment.results = json.dumps(task.result, default=str)
+                        logger.info(f'Saved results')
+                    if task.error:
+                        experiment.error = task.error
+                        logger.info(f'Saved error')
+
+                db.session.commit()
+                logger.info(f'After update - db.status={experiment.status}, db.progress={experiment.progress}, db.completed_at={experiment.completed_at}')
+            else:
+                logger.warning(f'Experiment {task.id} not found in database')
+    except Exception as e:
+        logger.error(f'Failed to sync task to database: {e}', exc_info=True)
 
 
 # ============================================================================
@@ -233,6 +273,11 @@ def api_task_create():
         # Create task
         task_id = task_manager.create_task(task_type, func, kwargs={'config': config})
 
+        # 获取任务并注册状态同步回调
+        task = task_manager.get_task(task_id)
+        if task:
+            task.add_status_callback(update_task_in_db)
+
         # Store in database
         with app.app_context():
             from api.models import Experiment
@@ -342,6 +387,8 @@ def api_analysis_list():
         status = request.args.get('status')
         task_type = request.args.get('task_type')
 
+        logger.info(f'API /api/analysis/list - params: status={status}, task_type={task_type}')
+
         query = Experiment.query
 
         if status:
@@ -353,6 +400,8 @@ def api_analysis_list():
 
         pagination = query.paginate(page=page, per_page=page_size, error_out=False)
 
+        logger.info(f'API /api/analysis/list - found {pagination.total} experiments, returning {len(pagination.items)} items')
+
         return jsonify({
             'success': True,
             'experiments': [e.to_dict() for e in pagination.items],
@@ -362,7 +411,7 @@ def api_analysis_list():
         })
 
     except Exception as e:
-        logger.error(f'Analysis list error: {e}')
+        logger.error(f'Analysis list error: {e}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 400
 
 

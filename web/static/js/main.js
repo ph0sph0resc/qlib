@@ -9,8 +9,11 @@ const API = {
     baseUrl: '/api',
 
     async get(endpoint, params = {}) {
-        const url = new URL(this.baseUrl + endpoint, window.location.origin);
-        Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+        let url = this.baseUrl + endpoint;
+        if (Object.keys(params).length > 0) {
+            const queryString = new URLSearchParams(params).toString();
+            url += '?' + queryString;
+        }
         const response = await fetch(url);
         return await response.json();
     },

@@ -159,6 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadTrainedModels() {
     try {
+        console.log('Loading trained models from API...');
         const result = await API.get('/analysis/list', {
             task_type: 'model_train',
             status: 'completed'
@@ -168,15 +169,30 @@ async function loadTrainedModels() {
             const select = document.getElementById('backtest-model');
             select.innerHTML = '<option value="">请选择模型...</option>';
 
-            result.experiments.forEach(exp => {
+            if (result.experiments && result.experiments.length > 0) {
+                result.experiments.forEach(exp => {
+                    const option = document.createElement('option');
+                    option.value = exp.id;
+                    const displayName = exp.name || '未命名模型';
+                    option.textContent = `${displayName} (${exp.id.substring(0, 8)})`;
+                    select.appendChild(option);
+                });
+                console.log(`Loaded ${result.experiments.length} trained models`);
+            } else {
+                console.log('No trained models found in database');
                 const option = document.createElement('option');
-                option.value = exp.id;
-                option.textContent = `${exp.name} - ${exp.id.substring(0, 8)}`;
+                option.value = '';
+                option.textContent = '暂无已训练模型，请先进行模型训练';
+                option.disabled = true;
                 select.appendChild(option);
-            });
+            }
+        } else {
+            console.error('API request failed:', result);
+            showAlert('加载模型列表失败: ' + (result.error || '未知错误'), 'danger');
         }
     } catch (error) {
         console.error('Failed to load models:', error);
+        showAlert('加载模型失败，请检查网络连接', 'danger');
     }
 }
 
@@ -277,19 +293,24 @@ async function monitorBacktestTask(taskId) {
                 } else if (task.status === 'cancelled') {
                     clearInterval(interval);
                     showAlert('回测已取消', 'warning');
+                } else if (task.status === 'running') {
+                    // 任务正在运行，继续监控，不要停止
+                    console.log('Backtest task running, continuing to monitor...');
                 }
             } else {
                 clearInterval(interval);
-                showAlert('获取任务状态失败', 'danger');
+                console.error('Unknown task status:', task.status);
             }
         } catch (error) {
             console.error('Monitor backtest error:', error);
-            clearInterval(interval);
+            // 不清除定时器，继续尝试
         }
     }, 2000);
 }
 
 function displayBacktestResults(results) {
+    console.log('displayBacktestResults called with:', results);
+
     if (!results) {
         showAlert('没有可用的回测结果', 'warning');
         return;
@@ -298,34 +319,54 @@ function displayBacktestResults(results) {
     // 更新关键指标
     if (results.total_return !== undefined) {
         document.getElementById('total-return').textContent = formatPercentage(results.total_return);
+    } else {
+        console.warn('total_return is undefined');
     }
+
     if (results.annual_return !== undefined) {
         document.getElementById('annual-return').textContent = formatPercentage(results.annual_return);
+    } else {
+        console.warn('annual_return is undefined');
     }
+
     if (results.sharpe_ratio !== undefined) {
         document.getElementById('sharpe-ratio').textContent = formatNumber(results.sharpe_ratio, 2);
+    } else {
+        console.warn('sharpe_ratio is undefined');
     }
+
     if (results.max_drawdown !== undefined) {
         document.getElementById('max-drawdown').textContent = formatPercentage(results.max_drawdown);
+    } else {
+        console.warn('max_drawdown is undefined');
     }
 
     // 更新净值曲线
     if (results.dates && results.portfolio_curve) {
+        console.log('Updating portfolio chart with', results.dates.length, 'dates and', results.portfolio_curve.length, 'data points');
         createPortfolioChart('portfolio-chart',
             results.dates,
             results.portfolio_curve,
             results.benchmark_curve || null
         );
+    } else {
+        console.warn('dates or portfolio_curve is undefined in results');
     }
 
     // 更新回撤曲线
     if (results.dates && results.drawdown_series) {
+        console.log('Updating drawdown chart');
         createDrawdownChart('drawdown-chart', results.dates, results.drawdown_series);
+    } else {
+        console.warn('dates or drawdown_series is undefined in results');
     }
 
     // 更新交易记录
     if (results.trades) {
+        console.log('Updating trade records with', results.trades.length, 'trades');
         displayTradeRecords(results.trades);
+    } else {
+        console.warn('trades is undefined in results');
     }
 
     showAlert('回测结果已显示', 'success');

@@ -41,6 +41,7 @@ class Task:
         self._thread = None
         self._stop_event = threading.Event()
         self._log_queue = queue.Queue()
+        self._status_callbacks = []  # 状态变更回调列表
 
     def start(self):
         """Start the task in a background thread"""
@@ -70,6 +71,9 @@ class Task:
             self._log_queue.put(('ERROR', f'Task {self.id} failed: {str(e)}'))
         finally:
             self.completed_at = datetime.now().isoformat()
+            # 触发状态变更回调 - 关键修复！任务完成时必须触发回调
+            logger.info(f'Task {self.id} finished with status={self.status}, triggering callbacks')
+            self._notify_status_change()
 
     def stop(self):
         """Stop the task"""
@@ -89,6 +93,8 @@ class Task:
         if message:
             self.message = message
             self._log_queue.put(('INFO', message))
+        # 触发进度更新回调
+        self._notify_status_change()
 
     def get_logs(self) -> list:
         """Get all queued logs"""
@@ -99,6 +105,18 @@ class Task:
             except queue.Empty:
                 break
         return logs
+
+    def add_status_callback(self, callback: Callable):
+        """添加状态变更回调"""
+        self._status_callbacks.append(callback)
+
+    def _notify_status_change(self):
+        """通知所有注册的回调"""
+        for callback in self._status_callbacks:
+            try:
+                callback(self)
+            except Exception as e:
+                logger.error(f'Status callback error: {e}')
 
     def to_dict(self) -> dict:
         """Convert task to dictionary"""
