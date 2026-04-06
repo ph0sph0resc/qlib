@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadTrainedModels() {
     try {
         console.log('Loading trained models from API...');
-        const result = await API.get('/analysis/list', {
+        const result = await API.get('/api/analysis/list', {
             task_type: 'model_train',
             status: 'completed'
         });
@@ -201,12 +201,12 @@ async function loadModelInfo() {
     if (!modelId) return;
 
     try {
-        const result = await API.get(`/analysis/detail/${modelId}`);
+        const result = await API.get(`/api/analysis/detail/${modelId}`);
 
         if (result.success) {
             const exp = result.experiment;
             if (exp.results) {
-                // 如果模型有训练结果，可以更新回测配置
+                // Update backtest config if model has results
                 console.log('Model results:', exp.results);
             }
         }
@@ -222,32 +222,58 @@ async function runBacktest() {
         return;
     }
 
+    const backtestConfig = {
+        start_time: document.getElementById('bt-start-date').value,
+        end_time: document.getElementById('bt-end-date').value,
+        account: parseFloat(document.getElementById('initial-cash').value),
+        benchmark: document.getElementById('benchmark').value,
+        exchange_kwargs: {
+            open_cost: parseFloat(document.getElementById('open-cost').value) / 100,
+            close_cost: parseFloat(document.getElementById('close-cost').value) / 100
+        },
+        strategy: {
+            type: document.getElementById('strategy').value,
+            topk: parseInt(document.getElementById('topk').value)
+        }
+    };
+
+    // Get recorder_id from experiment details
+    let recorderId = null;
+    try {
+        const detailResult = await API.get(`/api/analysis/detail/${modelId}`);
+        if (detailResult.success && detailResult.experiment && detailResult.experiment.results) {
+            const results = JSON.parse(detailResult.experiment.results);
+            // Prioritize using recorder_id, otherwise use model or experiment ID
+            recorderId = results.recorder_id || results.model || modelId;
+            console.log('Using recorder_id:', recorderId);
+        } else {
+            // If unable to get details, use original ID
+            recorderId = modelId;
+        }
+    } catch (error) {
+        console.error('Failed to get recorder_id:', error);
+        // If error occurs, use original ID
+        recorderId = modelId;
+    }
+
+    if (!recorderId) {
+        showAlert('无法获取模型ID', 'danger');
+        return;
+    }
+
     const config = {
         qlib_init: {
             provider_uri: '~/.qlib/qlib_data/cn_data',
             region: 'cn'
         },
-        backtest_config: {
-            start_time: document.getElementById('bt-start-date').value,
-            end_time: document.getElementById('bt-end-date').value,
-            account: parseFloat(document.getElementById('initial-cash').value),
-            benchmark: document.getElementById('benchmark').value,
-            exchange_kwargs: {
-                open_cost: parseFloat(document.getElementById('open-cost').value) / 100,
-                close_cost: parseFloat(document.getElementById('close-cost').value) / 100
-            },
-            strategy: {
-                type: document.getElementById('strategy').value,
-                topk: parseInt(document.getElementById('topk').value)
-            }
-        },
-        model_id: modelId
+        backtest_config: backtestConfig,
+        model_id: recorderId
     };
 
     try {
         showAlert('正在创建回测任务...', 'info');
 
-        const result = await API.post('/task', {
+        const result = await API.post('/api/task', {
             task_type: 'backtest',
             config: config,
             name: `回测 - ${document.getElementById('strategy').value}`
@@ -257,7 +283,7 @@ async function runBacktest() {
             currentBacktestTaskId = result.task_id;
             showAlert('任务已创建，正在启动...', 'success');
 
-            const startResult = await API.post(`/task/${currentBacktestTaskId}/start`);
+            const startResult = await API.post(`/api/task/${currentBacktestTaskId}/start`);
 
             if (startResult.success) {
                 showAlert('回测已启动', 'success');
@@ -278,7 +304,7 @@ async function runBacktest() {
 async function monitorBacktestTask(taskId) {
     const interval = setInterval(async () => {
         try {
-            const result = await API.get(`/task/${taskId}/status`);
+            const result = await API.get(`/api/task/${taskId}/status`);
 
             if (result.success) {
                 const task = result.task;
@@ -294,16 +320,16 @@ async function monitorBacktestTask(taskId) {
                     clearInterval(interval);
                     showAlert('回测已取消', 'warning');
                 } else if (task.status === 'running') {
-                    // 任务正在运行，继续监控，不要停止
+                    // Task is running, continue monitoring, don't stop
                     console.log('Backtest task running, continuing to monitor...');
+                } else {
+                    clearInterval(interval);
+                    console.error('Unknown task status:', task.status);
                 }
-            } else {
-                clearInterval(interval);
-                console.error('Unknown task status:', task.status);
             }
         } catch (error) {
             console.error('Monitor backtest error:', error);
-            // 不清除定时器，继续尝试
+            // Don't clear interval, keep trying
         }
     }, 2000);
 }
@@ -316,7 +342,7 @@ function displayBacktestResults(results) {
         return;
     }
 
-    // 更新关键指标
+    // Update key metrics
     if (results.total_return !== undefined) {
         document.getElementById('total-return').textContent = formatPercentage(results.total_return);
     } else {
@@ -341,7 +367,7 @@ function displayBacktestResults(results) {
         console.warn('max_drawdown is undefined');
     }
 
-    // 更新净值曲线
+    // Update portfolio curve
     if (results.dates && results.portfolio_curve) {
         console.log('Updating portfolio chart with', results.dates.length, 'dates and', results.portfolio_curve.length, 'data points');
         createPortfolioChart('portfolio-chart',
@@ -353,7 +379,7 @@ function displayBacktestResults(results) {
         console.warn('dates or portfolio_curve is undefined in results');
     }
 
-    // 更新回撤曲线
+    // Update drawdown curve
     if (results.dates && results.drawdown_series) {
         console.log('Updating drawdown chart');
         createDrawdownChart('drawdown-chart', results.dates, results.drawdown_series);
@@ -361,7 +387,7 @@ function displayBacktestResults(results) {
         console.warn('dates or drawdown_series is undefined in results');
     }
 
-    // 更新交易记录
+    // Update trade records
     if (results.trades) {
         console.log('Updating trade records with', results.trades.length, 'trades');
         displayTradeRecords(results.trades);
@@ -392,7 +418,7 @@ function displayTradeRecords(trades) {
 }
 
 function initBacktestCharts() {
-    // 初始化示例图表
+    // Initialize sample charts
     const dates = ['2020-01', '2020-02', '2020-03', '2020-04', '2020-05', '2020-06'];
     createPortfolioChart('portfolio-chart', dates, [1.0, 1.05, 1.12, 1.08, 1.15, 1.2], [1.0, 1.02, 1.04, 1.01, 1.05, 1.08]);
     createDrawdownChart('drawdown-chart', dates, [0, -0.02, 0, -0.04, 0, 0]);
