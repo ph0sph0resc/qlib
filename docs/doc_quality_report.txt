@@ -1,0 +1,238 @@
+backtest__init__.md: 缺少参数说明
+README.md: 缺少函数/方法级别文档, 缺少参数说明
+tests/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+tests/data.md: 缺少函数/方法级别文档, 缺少参数说明
+tests/config.md: 缺少函数/方法级别文档, 缺少参数说明
+workflow/record_temp.md: 缺少参数说明
+workflow/utils.md: 缺少函数/方法级别文档, 缺少参数说明
+workflow/expm.md: 缺少参数说明
+workflow/__init__.md: 缺少参数说明
+workflow/recorder.md: 缺少参数说明
+workflow/exp.md: 缺少参数说明
+qlib/constant.py.md: 缺少函数/方法级别文档, 缺少参数说明
+qlib/typehint.py.md: 缺少函数/方法级别文档, 缺少参数说明
+data/inst_processor.md: 缺少函数/方法级别文档, 缺少参数说明
+data/__init__.md: 缺少参数说明
+data/data.md: 缺少函数/方法级别文档, 缺少参数说明
+data/ops.md: 缺少函数/方法级别文档, 缺少参数说明
+data/base.md: 缺少函数/方法级别文档, 缺少参数说明
+data/cache.md: 缺少函数/方法级别文档, 缺少参数说明
+data/filter.md: 缺少函数/方法级别文档, 缺少参数说明
+data/pit.md: 缺少参数说明
+data/client.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/interpreter.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/simulator.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/reward.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/__init__py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/aux_info.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/seed.md: 缺少函数/方法级别文档, 缺少参数说明
+model/utils.md: 缺少参数说明
+model/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+model/base.md: 缺少参数说明
+strategy/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+strategy/base.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/executor.md: 缺少参数说明
+backtest/module_backtest.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/decision.md: 缺少参数说明
+backtest/profit_attribution.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/utils.md: 缺少参数说明
+backtest/report.md: 缺少参数说明
+backtest/module_backtest_caller.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/exchange.md: 缺少参数说明
+backtest/high_performance_ds.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/backtest.md: 缺少参数说明
+backtest/README.md: 缺少函数/方法级别文档, 缺少参数说明
+backtest/signal.md: 缺少参数说明
+backtest/position.md: 缺少参数说明
+backtest/account.md: 缺少参数说明
+utils/file.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/exceptions.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/index_data.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/data.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/paral.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/mod.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/pickle_utils.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/serial.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/objm.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/time.md: 缺少函数/方法级别文档, 缺少参数说明
+utils/resam.md: 缺少函数/方法级别文档, 缺少参数说明
+cli/run.md: 缺少函数/方法级别文档, 缺少参数说明
+cli/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+cli/data.md: 缺少函数/方法级别文档, 缺少参数说明
+root/constant.md: 缺少函数/方法级别文档, 缺少参数说明
+root/log.md: 缺少函数/方法级别文档, 缺少参数说明
+root/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+root/typehint.md: 缺少函数/方法级别文档, 缺少参数说明
+root/config.md: 缺少函数/方法级别文档, 缺少参数说明
+workflow/task/collect.md: 缺少参数说明
+workflow/task/manage.md: 缺少参数说明
+workflow/task/utils.md: 缺少参数说明
+workflow/task/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+workflow/task/gen.md: 缺少参数说明
+workflow/online/utils.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+workflow/online/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+workflow/online/update.md: 缺少参数说明
+workflow/online/strategy.md: 缺少参数说明
+workflow/online/manager.md: 缺少参数说明
+data/storage/storage.md: 缺少函数/方法级别文档, 缺少参数说明
+data/storage/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+data/storage/file_storage.md: 缺少函数/方法级别文档, 缺少参数说明
+data/_libs/expanding.md: 缺少函数/方法级别文档
+data/_libs/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+data/_libs/rolling.md: 缺少函数/方法级别文档
+data/dataset/storage.md: 缺少参数说明
+data/dataset/utils.md: 缺少参数说明
+data/dataset/weight.md: 缺少参数说明
+data/dataset/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+data/dataset/processor.md: 缺少参数说明
+data/dataset/handler.md: 缺少函数/方法级别文档, 缺少参数说明
+data/dataset/loader.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/data/native.md: 缺少函数/方法级别文档
+rl/data/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/data/base.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/data/integration.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/data/__init__py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/data/pickle_styled.md: 缺少函数/方法级别文档
+rl/strategy/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/strategy/__init__.py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/strategy/single_order.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/order_execution/interpreter.md: 缺少参数说明
+rl/order_execution/utils.md: 缺少参数说明
+rl/order_execution/state.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/order_execution/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/order_execution/network.md: 缺少参数说明
+rl/order_execution/policy.md: 缺少参数说明
+rl/order_execution/reward.md: 缺少参数说明
+rl/order_execution/strategy.md: 缺少参数说明
+rl/order_execution/simulator_simple.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/order_execution/simulator_qlib.md: 缺少参数说明
+rl/order_execution/__init__.py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/utils/finite_env.md: 缺少参数说明
+rl/utils/log.md: 缺少参数说明
+rl/utils/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/utils/__init__.py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/utils/env_wrapper.md: 缺少参数说明
+rl/utils/data_queue.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/contrib/naive_config_parser.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/contrib/utils.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/contrib/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/contrib/backtest.md: 缺少函数/方法级别文档
+rl/contrib/train_onpolicy.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/contrib/__init__py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/trainer/callbacks.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/trainer/trainer.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/trainer/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+rl/trainer/__init__.py.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/trainer/api.md: 缺少函数/方法级别文档, 缺少参数说明
+rl/trainer/vessel.md: 缺少参数说明
+model/interpret/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+model/interpret/base.md: 缺少参数说明
+model/meta/model.md: 缺少参数说明
+model/meta/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+model/meta/dataset.md: 缺少参数说明
+model/meta/task.md: 缺少参数说明
+model/riskmodel/structured.md: 缺少参数说明
+model/riskmodel/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+model/riskmodel/shrink.md: 缺少参数说明
+model/riskmodel/base.md: 缺少参数说明
+model/riskmodel/poet.md: 缺少参数说明
+model/ens/__init__.md: 缺少函数/方法级别文档, 缺少参数说明
+model/ens/ensemble.md: 缺少参数说明
+model/ens/group.md: 缺少参数说明
+contrib/workflow/record_temp.md: 缺少参数说明
+contrib/workflow/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/meta/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/tuner/tuner.md: 缺少参数说明
+contrib/tuner/space.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/tuner/launcher.md: 缺少参数说明
+contrib/tuner/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/tuner/pipeline.md: 缺少参数说明
+contrib/tuner/config.md: 缺少参数说明
+contrib/data/highfreq_handler.md: 缺少参数说明
+contrib/data/highfreq_processor.md: 缺少参数说明
+contrib/data/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/data/dataset.md: 缺少参数说明
+contrib/data/data.md: 缺少参数说明
+contrib/data/processor.md: 缺少参数说明
+contrib/data/handler.md: 缺少参数说明
+contrib/data/loader.md: 缺少参数说明
+contrib/data/highfreq_provider.md: 缺少参数说明
+contrib/online/online_model.md: 缺少参数说明
+contrib/online/utils.md: 缺少参数说明
+contrib/online/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/online/user.md: 缺少参数说明
+contrib/online/operator.md: 缺少参数说明
+contrib/online/manager.md: 缺少参数说明
+contrib/report/utils.md: 缺少参数说明
+contrib/report/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/report/graph.md: 缺少参数说明
+contrib/model/pytorch_gru_ts.md: 缺少参数说明
+contrib/model/pytorch_tabnet.md: 缺少参数说明
+contrib/model/pytorch_gats_ts.md: 缺少参数说明
+contrib/model/pytorch_adarnn.md: 缺少参数说明
+contrib/model/pytorch_sfm.md: 缺少参数说明
+contrib/model/pytorch_localformer_ts.md: 缺少参数说明
+contrib/model/pytorch_tcn.md: 缺少参数说明
+contrib/model/pytorch_igmtf.md: 缺少参数说明
+contrib/model/pytorch_alstm.md: 缺少参数说明
+contrib/model/pytorch_alstm_ts.md: 缺少参数说明
+contrib/model/pytorch_tcn_ts.md: 缺少参数说明
+contrib/model/pytorch_utils.md: 缺少参数说明
+contrib/model/pytorch_general_nn.md: 缺少参数说明
+contrib/model/pytorch_gru.md: 缺少参数说明
+contrib/model/pytorch_gats.md: 缺少参数说明
+contrib/model/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/model/gbdt.md: 缺少参数说明
+contrib/model/linear.md: 缺少参数说明
+contrib/model/double_ensemble.md: 缺少参数说明
+contrib/model/catboost_model.md: 缺少参数说明
+contrib/model/pytorch_transformer.md: 缺少参数说明
+contrib/model/pytorch_transformer_ts.md: 缺少参数说明
+contrib/model/highfreq_gdbt_model.md: 缺少参数说明
+contrib/model/pytorch_nn.md: 缺少参数说明
+contrib/model/pytorch_add.md: 缺少参数说明
+contrib/model/pytorch_tra.md: 缺少参数说明
+contrib/model/pytorch_tcts.md: 缺少参数说明
+contrib/model/pytorch_sandwich.md: 缺少参数说明
+contrib/model/pytorch_lstm_ts.md: 缺少参数说明
+contrib/model/pytorch_localformer.md: 缺少参数说明
+contrib/model/xgboost.md: 缺少参数说明
+contrib/model/pytorch_lstm.md: 缺少参数说明
+contrib/model/pytorch_hist.md: 缺少参数说明
+contrib/model/pytorch_krnn.md: 缺少参数说明
+contrib/strategy/rule_strategy.md: 缺少参数说明
+contrib/strategy/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/strategy/order_generator.md: 缺少参数说明
+contrib/strategy/signal_strategy.md: 缺少参数说明
+contrib/rolling/__main__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/rolling/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/rolling/base.md: 缺少参数说明
+contrib/rolling/ddgda.md: 缺少参数说明
+contrib/ops/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/ops/high_freq.md: 缺少参数说明
+contrib/eva/alpha.md: 缺少参数说明
+contrib/eva/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/meta/data_selection/model.md: 缺少参数说明
+contrib/meta/data_selection/utils.md: 缺少参数说明
+contrib/meta/data_selection/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/meta/data_selection/net.md: 缺少参数说明
+contrib/meta/data_selection/dataset.md: 缺少参数说明
+contrib/data/utils/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/data/utils/sepdf.md: 缺少参数说明
+contrib/report/data/ana.md: 缺少参数说明
+contrib/report/data/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/report/data/base.md: 缺少参数说明
+contrib/report/analysis_position/parse_position.md: 缺少参数说明
+contrib/report/analysis_position/risk_analysis.md: 缺少参数说明
+contrib/report/analysis_position/report.md: 缺少参数说明
+contrib/report/analysis_position/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/report/analysis_position/cumulative_return.md: 缺少参数说明
+contrib/report/analysis_position/rank_label.md: 缺少参数说明
+contrib/report/analysis_model/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/report/analysis_model/analysis_model_performance.md: 缺少参数说明
+contrib/strategy/optimizer/__init__.md: 缺少函数/方法级别文档, 缺少类定义, 缺少参数说明
+contrib/strategy/optimizer/optimizer.md: 缺少参数说明
+contrib/strategy/optimizer/base.md: 缺少参数说明
+contrib/strategy/optimizer/enhanced_indexing.md: 缺少参数说明
