@@ -312,7 +312,17 @@ async function startTraining() {
                 class: modelType,
                 module_path: getModelModulePath(modelType),
                 kwargs: collectModelParams()
-            }
+            },
+            record: [
+                {
+                    class: 'SignalRecord',
+                    module_path: 'qlib.workflow.record_temp',
+                    kwargs: {
+                        model: '<MODEL>',
+                        dataset: '<DATASET>'
+                    }
+                }
+            ]
         }
     };
 

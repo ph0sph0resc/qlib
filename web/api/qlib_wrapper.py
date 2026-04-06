@@ -397,7 +397,8 @@ class QLibWrapper:
                 pred = recorder.load_object('pred.pkl')
                 if isinstance(pred, pd.DataFrame):
                     results['prediction_shape'] = pred.shape
-                    results['prediction_sample'] = pred.head(5).to_dict()
+                    # Use 'list' orientation to convert column names to strings (not tuples)
+                    results['prediction_sample'] = pred.head(5).to_dict('list')
                 elif hasattr(pred, 'shape'):
                     results['prediction_shape'] = pred.shape
             except Exception as e:
@@ -697,7 +698,8 @@ class QLibWrapper:
 
         # Calculate drawdown series
         portfolio_cumsum = np.cumsum(report_normal['return'].values)
-        portfolio_cummax = portfolio_cumsum.cummax()
+        # Use numpy to calculate cumulative maximum
+        portfolio_cummax = np.maximum.accumulate(portfolio_cumsum)
         drawdown_series = (portfolio_cumsum - portfolio_cummax).tolist()
 
         # Calculate risk metrics using QLib's risk_analysis
@@ -705,11 +707,11 @@ class QLibWrapper:
         excess_returns = strategy_returns - report_normal['bench']
 
         risk_metrics = risk_analysis(excess_returns, freq='day')
-
-        # Extract metrics - risk_metrics is a DataFrame with index as metric names
-        annual_return = risk_metrics.loc['annualized_return', 'mean']
-        sharpe_ratio = risk_metrics.loc['information_ratio', 'mean']
-        max_drawdown = risk_metrics.loc['max_drawdown', 'mean']
+        logger.error(f'risk_metrics : {risk_metrics['risk']}')
+        # Extract metrics - risk_analysis returns a Series with risk metrics as values
+        annual_return = risk_metrics['risk']['annualized_return']
+        sharpe_ratio = risk_metrics['risk']['information_ratio']
+        max_drawdown = risk_metrics['risk']['max_drawdown']
 
         # Calculate total return
         total_return = strategy_returns.sum()

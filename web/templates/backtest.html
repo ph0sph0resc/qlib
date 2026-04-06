@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadTrainedModels() {
     try {
         console.log('Loading trained models from API...');
-        const result = await API.get('/api/analysis/list', {
+        const result = await API.get('/analysis/list', {
             task_type: 'model_train',
             status: 'completed'
         });
@@ -201,7 +201,7 @@ async function loadModelInfo() {
     if (!modelId) return;
 
     try {
-        const result = await API.get(`/api/analysis/detail/${modelId}`);
+        const result = await API.get(`/analysis/detail/${modelId}`);
 
         if (result.success) {
             const exp = result.experiment;
@@ -238,15 +238,24 @@ async function runBacktest() {
     };
 
     // Get recorder_id from experiment details
+    console.log('=== DEBUG: Backtest Model ID ===');
+    console.log('Experiment ID:', (modelId));
+
     let recorderId = null;
     try {
-        const detailResult = await API.get(`/api/analysis/detail/${modelId}`);
+        console.log('Fetching model details from /api/analysis/detail/', modelId);
+        const detailResult = await API.get(`/analysis/detail/${modelId}`);
+        console.log('API response:', detailResult);
+
         if (detailResult.success && detailResult.experiment && detailResult.experiment.results) {
-            const results = JSON.parse(detailResult.experiment.results);
+            const results = detailResult.experiment.results;  // 已在后端解析为 JSON 对象，无需再次解析
+            console.log('Parsed results:', results);
+
             // Prioritize using recorder_id, otherwise use model or experiment ID
             recorderId = results.recorder_id || results.model || modelId;
-            console.log('Using recorder_id:', recorderId);
+            console.log('Final recorder_id to use:', recorderId);
         } else {
+            console.error('API response format unexpected:', detailResult);
             // If unable to get details, use original ID
             recorderId = modelId;
         }
@@ -273,7 +282,7 @@ async function runBacktest() {
     try {
         showAlert('正在创建回测任务...', 'info');
 
-        const result = await API.post('/api/task', {
+        const result = await API.post('/task', {
             task_type: 'backtest',
             config: config,
             name: `回测 - ${document.getElementById('strategy').value}`
@@ -283,7 +292,7 @@ async function runBacktest() {
             currentBacktestTaskId = result.task_id;
             showAlert('任务已创建，正在启动...', 'success');
 
-            const startResult = await API.post(`/api/task/${currentBacktestTaskId}/start`);
+            const startResult = await API.post(`/task/${currentBacktestTaskId}/start`);
 
             if (startResult.success) {
                 showAlert('回测已启动', 'success');
@@ -304,17 +313,37 @@ async function runBacktest() {
 async function monitorBacktestTask(taskId) {
     const interval = setInterval(async () => {
         try {
-            const result = await API.get(`/api/task/${taskId}/status`);
+            const result = await API.get(`/task/${taskId}/status`);
 
             if (result.success) {
                 const task = result.task;
 
                 if (task.status === 'completed') {
                     clearInterval(interval);
-                    showAlert('回测完成', 'success');
-                    displayBacktestResults(task.result);
+                    console.log('Backtest task completed!', task);
+                    console.log('Task result:', task.result);
+
+                    // 确保 result 存在且有效
+                    if (task.result && Object.keys(task.result).length > 0) {
+                        showAlert('回测完成', 'success');
+                        displayBacktestResults(task.result);
+                    } else {
+                        // 结果可能还未保存到数据库，延迟重试获取
+                        console.warn('Task result is empty, retrying in 1 second...');
+                        setTimeout(async () => {
+                            const retryResult = await API.get(`/task/${taskId}/status`);
+                            if (retryResult.success && retryResult.task.result) {
+                                console.log('Retry successful, got result:', retryResult.task.result);
+                                displayBacktestResults(retryResult.task.result);
+                                showAlert('回测完成', 'success');
+                            } else {
+                                showAlert('回测完成但结果加载失败，请刷新页面', 'warning');
+                            }
+                        }, 1000);
+                    }
                 } else if (task.status === 'failed') {
                     clearInterval(interval);
+                    console.error('Backtest task failed:', task);
                     showAlert('回测失败: ' + (task.error || '未知错误'), 'danger');
                 } else if (task.status === 'cancelled') {
                     clearInterval(interval);

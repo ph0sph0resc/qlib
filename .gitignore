@@ -51,3 +51,9 @@ tags
 ./pretrain
 .idea/
 .aider*
+
+# Windows Zone.Identifier files
+*:Zone.Identifier
+
+# Virtual environment
+venv0/
