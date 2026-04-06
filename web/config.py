@@ -44,9 +44,9 @@ AVAILABLE_REGIONS = ['cn', 'us']
 
 # Model categories
 MODEL_CATEGORIES = {
-    'ML': ['LGBModel', 'XGBModel', 'CatModel', 'Linear'],
+    'ML': ['LGBModel', 'XGBModel', 'CatBoostModel', 'LinearModel'],
     'DL': ['LSTM', 'GRU', 'Transformer', 'ALSTM', 'TCN', 'TFT', 'GATs', 'Localformer'],
-    'Advanced': ['DoubleEnsemble', 'TRA', 'TabNet', 'IGMTF', 'KRNN', 'ADARNN', 'HIST'],
+    'Advanced': ['DEnsembleModel', 'TRA', 'TabNet', 'IGMTF', 'KRNN', 'ADARNN', 'HIST'],
     'HF': ['HFLGBModel']
 }
 

@@ -79,8 +79,8 @@
                                 <select class="form-select" id="model-type" onchange="updateModelParams()">
                                     <option value="LGBModel">LightGBM</option>
                                     <option value="XGBModel">XGBoost</option>
-                                    <option value="CatModel">CatBoost</option>
-                                    <option value="Linear">Linear</option>
+                                    <option value="CatBoostModel">CatBoost</option>
+                                    <option value="LinearModel">Linear</option>
                                     <option value="LSTM">LSTM</option>
                                     <option value="GRU">GRU</option>
                                     <option value="Transformer">Transformer</option>
@@ -89,7 +89,7 @@
                                     <option value="TFT">TFT</option>
                                     <option value="GATs">GATs</option>
                                     <option value="Localformer">Localformer</option>
-                                    <option value="DoubleEnsemble">DoubleEnsemble</option>
+                                    <option value="DEnsembleModel">DoubleEnsemble</option>
                                     <option value="TRA">TRA</option>
                                     <option value="TabNet">TabNet</option>
                                     <option value="HFLGBModel">HFLGBModel</option>
@@ -360,9 +360,9 @@ async function startTraining() {
 function getModelModulePath(modelType) {
     const paths = {
         'LGBModel': 'qlib.contrib.model.gbdt',
-        'XGBModel': 'qlib.contrib.model.gbdt',
-        'CatModel': 'qlib.contrib.model.gbdt',
-        'Linear': 'qlib.contrib.model.linear',
+        'XGBModel': 'qlib.contrib.model.xgboost',
+        'CatBoostModel': 'qlib.contrib.model.catboost_model',
+        'LinearModel': 'qlib.contrib.model.linear',
         'LSTM': 'qlib.contrib.model.pytorch_lstm',
         'GRU': 'qlib.contrib.model.pytorch_gru',
         'Transformer': 'qlib.contrib.model.pytorch_transformer',
@@ -371,10 +371,10 @@ function getModelModulePath(modelType) {
         'TFT': 'qlib.contrib.model.pytorch_tft',
         'GATs': 'qlib.contrib.model.pytorch_gats',
         'Localformer': 'qlib.contrib.model.pytorch_localformer',
-        'DoubleEnsemble': 'qlib.contrib.model.doubleensemble',
+        'DEnsembleModel': 'qlib.contrib.model.double_ensemble',
         'TRA': 'qlib.contrib.model.tra',
         'TabNet': 'qlib.contrib.model.tabnet',
-        'HFLGBModel': 'qlib.contrib.model.hflgb'
+        'HFLGBModel': 'qlib.contrib.model.highfreq_gdbt_model'
     };
     return paths[modelType] || 'qlib.contrib.model.gbdt';
 }

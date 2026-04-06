@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from pathlib import Path
-
+from api.config_parser import ConfigParser
 logger = logging.getLogger(__name__)
 
 
@@ -241,7 +241,15 @@ class QLibWrapper:
             # Determine model parameters for progress tracking
             model_config = task_config.get('model', {})
             model_class = model_config.get('class', 'LGBModel')
+            logger.info(f'model_config={model_config}')
             model_kwargs = model_config.get('kwargs', {})
+
+            # Fix module_path if needed
+            
+            correct_module_path = ConfigParser.MODEL_MODULE_PATHS.get(model_class)
+            if correct_module_path and model_config.get('module_path') != correct_module_path:
+                logger.warning(f'Fixing module_path for {model_class}: {model_config.get("module_path")} -> {correct_module_path}')
+                model_config['module_path'] = correct_module_path
 
             # Estimate total epochs based on model type
             if model_class in ['LGBModel', 'XGBModel', 'CatBoostModel']:
@@ -314,7 +322,7 @@ class QLibWrapper:
 
             # Extract results from recorder
             results = self._extract_training_results(recorder, model_class, task_config)
-
+            logger.info(f'results={results}')
             # Add the captured metrics history
             if metrics_history['epochs']:
                 results['training_history'] = {
@@ -332,7 +340,8 @@ class QLibWrapper:
             results['experiment_name'] = experiment_name
 
             # Calculate final scores
-            if results['training_history']:
+            training_history = results.get('training_history')
+            if training_history:
                 if results['training_history']['valid_score']:
                     results['valid_score'] = results['training_history']['valid_score'][-1]
                 if results['training_history']['train_score']:
@@ -602,6 +611,7 @@ class QLibWrapper:
 
         # Extract exchange config
         exchange_kwargs = backtest_config.get('exchange_kwargs', {})
+        logger.info(f'Exchange kwargs from config: {exchange_kwargs}')
 
         # Build configuration
         config = {
@@ -638,6 +648,7 @@ class QLibWrapper:
             },
         }
 
+        logger.info(f'Final backtest config exchange_kwargs: {config["backtest"]["exchange_kwargs"]}')
         return config
 
     def _execute_backtest(self, recorder: Any, port_analysis_config: Dict, task=None) -> Dict:

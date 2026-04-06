@@ -259,7 +259,7 @@ def api_task_create():
         task_type = data.get('task_type')
         config = data.get('config', {})
         name = data.get('name', 'Unnamed Task')
-
+        logger.info(['config={config}'])
         # Determine which function to call
         if task_type == TASK_TYPES['FACTOR_TEST']:
             func = qlib.run_factor_analysis

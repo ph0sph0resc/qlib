@@ -58,6 +58,21 @@
                 </form>
             </div>
         </div>
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title">历史回测记录</h5>
+                <small class="text-muted" id="history-info">加载中...</small>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush" id="backtest-history-list" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center text-muted py-3">加载中...</div>
+                </div>
+                <button type="button" class="btn btn-success w-100 mt-3"
+                        id="btn-load-history" onclick="loadSelectedHistory()" disabled>
+                    加载选中的回测结果
+                </button>
+            </div>
+        </div>
     </div>
     <div class="col-md-8">
         <div class="card mb-3">
@@ -155,6 +170,7 @@ let currentBacktestTaskId = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadTrainedModels();
     initBacktestCharts();
+    loadBacktestHistory();
 });
 
 async function loadTrainedModels() {
@@ -327,6 +343,8 @@ async function monitorBacktestTask(taskId) {
                     if (task.result && Object.keys(task.result).length > 0) {
                         showAlert('回测完成', 'success');
                         displayBacktestResults(task.result);
+                        // 刷新历史记录列表
+                        loadBacktestHistory();
                     } else {
                         // 结果可能还未保存到数据库，延迟重试获取
                         console.warn('Task result is empty, retrying in 1 second...');
@@ -336,6 +354,8 @@ async function monitorBacktestTask(taskId) {
                                 console.log('Retry successful, got result:', retryResult.task.result);
                                 displayBacktestResults(retryResult.task.result);
                                 showAlert('回测完成', 'success');
+                                // 刷新历史记录列表
+                                loadBacktestHistory();
                             } else {
                                 showAlert('回测完成但结果加载失败，请刷新页面', 'warning');
                             }
@@ -451,6 +471,147 @@ function initBacktestCharts() {
     const dates = ['2020-01', '2020-02', '2020-03', '2020-04', '2020-05', '2020-06'];
     createPortfolioChart('portfolio-chart', dates, [1.0, 1.05, 1.12, 1.08, 1.15, 1.2], [1.0, 1.02, 1.04, 1.01, 1.05, 1.08]);
     createDrawdownChart('drawdown-chart', dates, [0, -0.02, 0, -0.04, 0, 0]);
+}
+
+// ========== 历史回测记录功能 ==========
+
+let selectedHistoryId = null;
+let backtestHistoryCache = [];
+
+async function loadBacktestHistory() {
+    try {
+        const result = await API.get('/analysis/list', {
+            task_type: 'backtest',
+            status: 'completed',
+            page: 1,
+            page_size: 20
+        });
+
+        if (result.success && result.experiments) {
+            backtestHistoryCache = result.experiments;
+            displayBacktestHistoryList(result.experiments);
+
+            // 如果有历史记录，自动加载最新的一条
+            if (result.experiments.length > 0) {
+                const latest = result.experiments[0];
+                selectedHistoryId = latest.id;
+                updateHistorySelection();
+                await loadHistoryDetail(latest.id);
+            } else {
+                document.getElementById('backtest-history-list').innerHTML =
+                    '<div class="text-center text-muted py-3">暂无历史回测记录</div>';
+                document.getElementById('history-info').textContent = '暂无记录';
+            }
+        } else {
+            console.error('Failed to load backtest history');
+            document.getElementById('backtest-history-list').innerHTML =
+                '<div class="text-center text-danger py-3">加载失败</div>';
+            document.getElementById('history-info').textContent = '加载失败';
+        }
+    } catch (error) {
+        console.error('Load backtest history error:', error);
+        document.getElementById('backtest-history-list').innerHTML =
+            '<div class="text-center text-danger py-3">网络错误</div>';
+        document.getElementById('history-info').textContent = '网络错误';
+    }
+}
+
+function displayBacktestHistoryList(experiments) {
+    const container = document.getElementById('backtest-history-list');
+
+    if (!experiments || experiments.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-3">暂无历史回测记录</div>';
+        document.getElementById('history-info').textContent = '暂无记录';
+        return;
+    }
+
+    container.innerHTML = experiments.map((exp, index) => {
+        const results = exp.results || {};
+        const totalReturn = results.total_return !== undefined
+            ? formatPercentage(results.total_return)
+            : '--';
+        const sharpeRatio = results.sharpe_ratio !== undefined
+            ? formatNumber(results.sharpe_ratio, 2)
+            : '--';
+        const date = formatDate(exp.created_at);
+        const isSelected = exp.id === selectedHistoryId;
+
+        return `
+            <div class="list-group-item list-group-item-action ${isSelected ? 'active' : ''}"
+                 onclick="selectHistoryItem('${exp.id}')"
+                 data-history-id="${exp.id}">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${exp.name || '未命名回测'}</h6>
+                    <small class="text-muted">${date}</small>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <small class="text-muted">总收益: </small>
+                        <span class="fw-bold ${results.total_return >= 0 ? 'text-success' : 'text-danger'}">
+                            ${totalReturn}
+                        </span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">夏普比率: </small>
+                        <span class="fw-bold">${sharpeRatio}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('history-info').textContent = `共 ${experiments.length} 条记录`;
+}
+
+function selectHistoryItem(historyId) {
+    selectedHistoryId = historyId;
+    updateHistorySelection();
+}
+
+function updateHistorySelection() {
+    const items = document.querySelectorAll('#backtest-history-list .list-group-item');
+    items.forEach(item => {
+        if (item.dataset.historyId === selectedHistoryId) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+
+    const btn = document.getElementById('btn-load-history');
+    if (selectedHistoryId) {
+        btn.disabled = false;
+        btn.textContent = '加载选中的回测结果';
+    } else {
+        btn.disabled = true;
+    }
+}
+
+async function loadSelectedHistory() {
+    if (!selectedHistoryId) {
+        showAlert('请先选择一条回测记录', 'warning');
+        return;
+    }
+
+    await loadHistoryDetail(selectedHistoryId);
+}
+
+async function loadHistoryDetail(historyId) {
+    try {
+        showAlert('正在加载回测详情...', 'info');
+
+        const result = await API.get(`/analysis/detail/${historyId}`);
+
+        if (result.success && result.experiment && result.experiment.results) {
+            displayBacktestResults(result.experiment.results);
+            showAlert('回测结果已加载', 'success');
+        } else {
+            showAlert('加载回测详情失败：结果数据无效', 'danger');
+        }
+    } catch (error) {
+        console.error('Load history detail error:', error);
+        showAlert('加载回测详情失败', 'danger');
+    }
 }
 </script>
 {% endblock %}

@@ -14,6 +14,30 @@ logger = logging.getLogger(__name__)
 class ConfigParser:
     """Parser for QLib YAML configurations"""
 
+    # Model module paths
+    MODEL_MODULE_PATHS = {
+        'LGBModel': 'qlib.contrib.model.gbdt',
+        'XGBModel': 'qlib.contrib.model.xgboost',
+        'CatBoostModel': 'qlib.contrib.model.catboost_model',
+        'LinearModel': 'qlib.contrib.model.linear',
+        'LSTM': 'qlib.contrib.model.pytorch_lstm_ts',
+        'GRU': 'qlib.contrib.model.pytorch_gru_ts',
+        'Transformer': 'qlib.contrib.model.pytorch_transformer_ts',
+        'ALSTM': 'qlib.contrib.model.pytorch_alstm_ts',
+        'TCN': 'qlib.contrib.model.pytorch_tcn_ts',
+        'TFT': 'qlib.contrib.model.pytorch_tfts',
+        'GATs': 'qlib.contrib.model.pytorch_gats_ts',
+        'Localformer': 'qlib.contrib.model.pytorch_localformer_ts',
+        'DEnsembleModel': 'qlib.contrib.model.double_ensemble',
+        'TRA': 'qlib.contrib.model.pytorch_tra',
+        'TabNet': 'qlib.contrib.model.pytorch_tabnet',
+        'IGMTF': 'qlib.contrib.model.pytorch_igmtf',
+        'KRNN': 'qlib.contrib.model.pytorch_krnn',
+        'ADARNN': 'qlib.contrib.model.pytorch_adarnn',
+        'HIST': 'qlib.contrib.model.pytorch_hist',
+        'HFLGBModel': 'qlib.contrib.model.highfreq_gdbt_model',
+    }
+
     # Model parameter schemas
     MODEL_SCHEMAS = {
         'LGBModel': {
@@ -33,11 +57,11 @@ class ConfigParser:
             'max_depth': {'type': 'int', 'default': 8, 'min': 1, 'max': 20},
             'subsample': {'type': 'float', 'default': 0.8, 'min': 0.1, 'max': 1.0},
         },
-        'CatModel': {
+        'CatBoostModel': {
             'learning_rate': {'type': 'float', 'default': 0.2, 'min': 0.001, 'max': 1.0},
             'depth': {'type': 'int', 'default': 8, 'min': 1, 'max': 20},
         },
-        'Linear': {
+        'LinearModel': {
             'fit_intercept': {'type': 'bool', 'default': True},
         },
         'LSTM': {
@@ -76,7 +100,7 @@ class ConfigParser:
             'hidden_size': {'type': 'int', 'default': 64, 'min': 8, 'max': 512},
             'window_size': {'type': 'int', 'default': 5, 'min': 1, 'max': 20},
         },
-        'DoubleEnsemble': {
+        'DEnsembleModel': {
             'base_model': {'type': 'select', 'default': 'gbm', 'options': ['gbm', 'lgb']},
             'loss': {'type': 'select', 'default': 'mse', 'options': ['mse', 'mae', 'huber']},
             'num_models': {'type': 'int', 'default': 6, 'min': 1, 'max': 20},
@@ -88,7 +112,7 @@ class ConfigParser:
             'bins_fs': {'type': 'int', 'default': 5, 'min': 2, 'max': 20},
             'decay': {'type': 'float', 'default': 0.5, 'min': 0.1, 'max': 1.0},
             'sample_ratios': {'type': 'list', 'default': [0.8, 0.7, 0.6, 0.5, 0.4]},
-            'sub_weights': {'type': 'list', 'default': [1.0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]},
+            'sub_weights': {'type': 'list', 'default': [1.0, 0.2, 0.2, 0.2, 0.2, 0.2]},
             'epochs': {'type': 'int', 'default': 28, 'min': 1, 'max': 100},
             'learning_rate': {'type': 'float', 'default': 0.2, 'min': 0.001, 'max': 1.0},
             'max_depth': {'type': 'int', 'default': 8, 'min': 1, 'max': 20},
@@ -274,9 +298,9 @@ class ConfigParser:
             Dictionary of model categories
         """
         return {
-            'ML': ['LGBModel', 'XGBModel', 'CatModel', 'Linear'],
+            'ML': ['LGBModel', 'XGBModel', 'CatBoostModel', 'LinearModel'],
             'DL': ['LSTM', 'GRU', 'Transformer', 'ALSTM', 'TCN', 'TFT', 'GATs', 'Localformer'],
-            'Advanced': ['DoubleEnsemble', 'TRA', 'TabNet', 'IGMTF', 'KRNN', 'ADARNN', 'HIST'],
+            'Advanced': ['DEnsembleModel', 'TRA', 'TabNet', 'IGMTF', 'KRNN', 'ADARNN', 'HIST'],
             'HF': ['HFLGBModel']
         }
 
@@ -359,6 +383,10 @@ class ConfigParser:
         model_class = model.get('class', 'LGBModel')
         model_kwargs = model.get('kwargs', {})
 
+        # Get module path from mapping or use existing value in config
+        default_module_path = ConfigParser.MODEL_MODULE_PATHS.get(model_class, 'qlib.contrib.model.gbdt')
+        module_path = model.get('module_path', default_module_path)
+
         schema = {
             'model_class': {
                 'type': 'select',
@@ -368,7 +396,7 @@ class ConfigParser:
             },
             'module_path': {
                 'type': 'text',
-                'default': model.get('module_path', 'qlib.contrib.model.gbdt'),
+                'default': module_path,
                 'label': 'Module Path'
             },
             'kwargs': ConfigParser.get_model_schema(model_class)
@@ -446,7 +474,17 @@ class ConfigParser:
 
         # Update model
         if 'model' in form_data:
-            config.setdefault('task', {}).setdefault('model', {}).update(form_data['model'])
+            model_data = form_data['model'].copy()
+            # Ensure module_path is set correctly based on model_class
+            if 'model_class' in model_data:
+                model_class = model_data['model_class']
+                if model_class in ConfigParser.MODEL_MODULE_PATHS:
+                    model_data['module_path'] = ConfigParser.MODEL_MODULE_PATHS[model_class]
+                else:
+                    # If not in mapping, keep existing module_path or use default
+                    if 'module_path' not in model_data:
+                        model_data['module_path'] = 'qlib.contrib.model.gbdt'
+            config.setdefault('task', {}).setdefault('model', {}).update(model_data)
 
         # Update backtest
         if 'backtest' in form_data:

@@ -90,7 +90,7 @@ def get_exchange(
     if limit_threshold is None:
         limit_threshold = C.limit_threshold
     if exchange is None:
-        logger.info("Create new exchange")
+        logger.info(f"Create new exchange with open_cost={open_cost}, close_cost={close_cost}, min_cost={min_cost}")
 
         exchange = Exchange(
             freq=freq,
