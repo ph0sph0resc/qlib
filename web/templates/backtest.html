@@ -36,11 +36,17 @@
                     </div>
                     <div class="mb-3">
                         <label for="strategy" class="form-label">策略类型</label>
-                        <select class="form-select" id="strategy">
+                        <select class="form-select" id="strategy" onchange="updateStrategyFields()">
                             <option value="TopkDropoutStrategy">TopkDropout</option>
                             <option value="SoftTopkStrategy">SoftTopk</option>
                             <option value="EnhancedIndexingStrategy">Enhanced Indexing</option>
                         </select>
+                    </div>
+                    <div class="mb-3" id="riskmodel-group" style="display: none;">
+                        <label for="riskmodel-root" class="form-label">风险模型路径 (Enhanced Indexing)</label>
+                        <input type="text" class="form-control" id="riskmodel-root"
+                               placeholder="例如: /path/to/riskdata">
+                        <small class="text-muted">包含按日期(YYYYMMDD)命名的子目录，每个子目录包含 factor_exp.pkl, factor_cov.pkl, specific_risk.pkl</small>
                     </div>
                     <div class="mb-3">
                         <label for="topk" class="form-label">持仓数量</label>
@@ -167,6 +173,17 @@
 <script>
 let currentBacktestTaskId = null;
 
+function updateStrategyFields() {
+    const strategyType = document.getElementById('strategy').value;
+    const riskmodelGroup = document.getElementById('riskmodel-group');
+    
+    if (strategyType === 'EnhancedIndexingStrategy') {
+        riskmodelGroup.style.display = 'block';
+    } else {
+        riskmodelGroup.style.display = 'none';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadTrainedModels();
     initBacktestCharts();
@@ -231,11 +248,30 @@ async function loadModelInfo() {
     }
 }
 
-async function runBacktest() {
+async function run() {
     const modelId = document.getElementById('backtest-model').value;
     if (!modelId) {
         showAlert('请先选择一个模型', 'warning');
         return;
+    }
+
+    const strategyType = document.getElementById('strategy').value;
+    const strategyConfig = { type: strategyType };
+
+    // 根据策略类型收集相应参数
+    if (strategyType === 'TopkDropoutStrategy') {
+        strategyConfig.topk = parseInt(document.getElementById('topk').value);
+        strategyConfig.n_drop = 5;
+    } else if (strategyType === 'SoftTopkStrategy') {
+        strategyConfig.topk = parseInt(document.getElementById('topk').value);
+        strategyConfig.risk_degree = 0.95;
+    } else if (strategyType === 'EnhancedIndexingStrategy') {
+        strategyConfig.riskmodel_root = document.getElementById('riskmodel-root').value;
+        if (!strategyConfig.riskmodel_root) {
+            showAlert('EnhancedIndexingStrategy 需要提供风险模型路径 (riskmodel_root)', 'warning');
+            return;
+        }
+        strategyConfig.market = 'csi500';
     }
 
     const backtestConfig = {
@@ -247,10 +283,7 @@ async function runBacktest() {
             open_cost: parseFloat(document.getElementById('open-cost').value) / 100,
             close_cost: parseFloat(document.getElementById('close-cost').value) / 100
         },
-        strategy: {
-            type: document.getElementById('strategy').value,
-            topk: parseInt(document.getElementById('topk').value)
-        }
+        strategy: strategyConfig
     };
 
     // Get recorder_id from experiment details

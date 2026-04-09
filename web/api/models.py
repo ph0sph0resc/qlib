@@ -4,6 +4,9 @@ Database Models for QLib Web
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
 
@@ -37,6 +40,15 @@ class Experiment(db.Model):
     parent_id = db.Column(db.String(64))  # For linked experiments (train -> backtest)
 
     def to_dict(self):
+        # Parse results JSON safely
+        results = None
+        if self.results:
+            try:
+                results = json.loads(self.results)
+            except json.JSONDecodeError as e:
+                logger.error(f'Failed to parse results JSON for experiment {self.id}: {e}')
+                results = None
+
         return {
             'id': self.id,
             'name': self.name,
@@ -50,7 +62,7 @@ class Experiment(db.Model):
             'message': self.message,
             'error': self.error,
             'parent_id': self.parent_id,
-            'results': json.loads(self.results) if self.results else None
+            'results': results
         }
 
     def get_results(self):

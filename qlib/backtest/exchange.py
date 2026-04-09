@@ -698,15 +698,15 @@ class Exchange:
                 not self.check_stock_suspended(stock_id=stock_id, start_time=start_time, end_time=end_time)
                 and not self.check_stock_limit(stock_id=stock_id, start_time=start_time, end_time=end_time)
             ):
-                value += (
-                    self.get_deal_price(
-                        stock_id=stock_id,
-                        start_time=start_time,
-                        end_time=end_time,
-                        direction=direction,
-                    )
-                    * amount_dict[stock_id]
+                deal_price = self.get_deal_price(
+                    stock_id=stock_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                    direction=direction,
                 )
+                # Skip if deal_price is None or NaN (cannot get price)
+                if deal_price is not None and not np.isnan(deal_price):
+                    value += deal_price * amount_dict[stock_id]
         return value
 
     def _get_factor_or_raise_error(

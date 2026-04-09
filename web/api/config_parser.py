@@ -14,6 +14,39 @@ logger = logging.getLogger(__name__)
 class ConfigParser:
     """Parser for QLib YAML configurations"""
 
+    # backtest strategy module paths
+    BACKTEST_MODULE_PATHS ={
+        'TopkDropoutStrategy':'qlib.contrib.strategy',
+        'SoftTopkStrategy':'qlib.contrib.strategy.cost_control',
+        'EnhancedIndexingStrategy':'qlib.contrib.strategy',
+    }
+
+    # Strategy types
+    STRATEGY_TYPES = ['TopkDropoutStrategy', 'SoftTopkStrategy', 'EnhancedIndexingStrategy']
+
+    # Strategy parameter schemas
+    STRATEGY_SCHEMAS = {
+        'TopkDropoutStrategy': {
+            'topk': {'type': 'int', 'default': 50, 'min': 1, 'label': '持仓股票数量'},
+            'n_drop': {'type': 'int', 'default': 5, 'min': 1, 'label': '每次更换数量'},
+            'method_sell': {'type': 'select', 'default': 'bottom', 'options': ['bottom', 'random'], 'label': '卖出策略'},
+            'method_buy': {'type': 'select', 'default': 'top', 'options': ['top', 'random'], 'label': '买入策略'},
+            'hold_thresh': {'type': 'int', 'default': 1, 'min': 1, 'label': '最小持有天数'},
+        },
+        'SoftTopkStrategy': {
+            'topk': {'type': 'int', 'default': 50, 'min': 1, 'label': '持仓股票数量'},
+            'risk_degree': {'type': 'float', 'default': 0.95, 'min': 0.0, 'max': 1.0, 'label': '风险度'},
+            'trade_impact_limit': {'type': 'float', 'default': None, 'min': 0.0, 'max': 1.0, 'label': '交易影响限制'},
+            'max_sold_weight': {'type': 'float', 'default': 1.0, 'min': 0.0, 'max': 1.0, 'label': '最大卖出权重'},
+            'buy_method': {'type': 'select', 'default': 'first_fill', 'options': ['first_fill', 'random', 'top'], 'label': '买入方式'},
+        },
+        'EnhancedIndexingStrategy': {
+            'riskmodel_root': {'type': 'text', 'required': True, 'label': '风险模型路径'},
+            'market': {'type': 'select', 'default': 'csi500', 'options': ['csi300', 'csi500', 'all'], 'label': '市场'},
+            'turn_limit': {'type': 'float', 'default': None, 'min': 0.0, 'max': 1.0, 'label': '换手率限制'},
+        }
+    }
+
     # Model module paths
     MODEL_MODULE_PATHS = {
         'LGBModel': 'qlib.contrib.model.gbdt',
@@ -423,6 +456,8 @@ class ConfigParser:
         """Extract backtest schema"""
         port_analysis = config.get('port_analysis_config', {})
         backtest = port_analysis.get('backtest', {})
+        strategy_config = backtest.get('strategy', {})
+        strategy_type = strategy_config.get('type', 'TopkDropoutStrategy')
 
         return {
             'start_time': {
@@ -444,6 +479,19 @@ class ConfigParser:
                 'type': 'text',
                 'default': backtest.get('benchmark', 'SH000300'),
                 'label': 'Benchmark'
+            },
+            'strategy': {
+                'type': 'object',
+                'label': 'Strategy Configuration',
+                'properties': {
+                    'type': {
+                        'type': 'select',
+                        'default': strategy_type,
+                        'options': ConfigParser.STRATEGY_TYPES,
+                        'label': 'Strategy Type'
+                    },
+                    **ConfigParser.STRATEGY_SCHEMAS.get(strategy_type, {})
+                }
             }
         }
 

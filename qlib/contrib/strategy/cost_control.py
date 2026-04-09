@@ -57,7 +57,13 @@ class SoftTopkStrategy(WeightStrategyBase):
             return weight if self.trade_impact_limit is None else min(weight, self.trade_impact_limit)
 
         ideal_per_stock = self.risk_degree / self.topk
-        ideal_list = score.sort_values(ascending=False).iloc[: self.topk].index.tolist()
+        # Handle both Series and DataFrame for score
+        #if isinstance(score, pd.DataFrame):
+            # For DataFrame, specify the column to sort by (use first column)
+        ideal_list = score.iloc[:, 0].sort_values(ascending=False).iloc[: self.topk].index.tolist()
+        #else:
+            # For Series, sort_values works directly
+        #    ideal_list = score.sort_values(ascending=False).iloc[: self.topk].index.tolist()
 
         cur_weights = current.get_stock_weight_dict(only_stock=True)
         initial_total_weight = sum(cur_weights.values())

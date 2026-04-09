@@ -534,8 +534,9 @@ class QLibWrapper:
 
             # Step 3: Build backtest configuration
             backtest_config = config.get('backtest_config', {})
+            logger.info(f'backtest_config ={backtest_config}')
             port_analysis_config = self._build_backtest_config(pred, backtest_config)
-
+            logger.info(f'port_analysis_config ={port_analysis_config}')
             if task:
                 task.update_progress(50, 'Running backtest')
 
@@ -606,12 +607,56 @@ class QLibWrapper:
         # Extract strategy config
         strategy_config = backtest_config.get('strategy', {})
         strategy_type = strategy_config.get('type', 'TopkDropoutStrategy')
-        topk = strategy_config.get('topk', 50)
-        n_drop = strategy_config.get('n_drop', 5)
+        strategy_module_path = ConfigParser.BACKTEST_MODULE_PATHS.get(strategy_type)
+
+        # Initialize strategy kwargs with common pred parameter
+        strategy_kwargs = {"signal": pred}
+
+        # Handle different strategies with their required parameters
+        if strategy_type == 'TopkDropoutStrategy':
+            topk = strategy_config.get('topk', 50)
+            n_drop = strategy_config.get('n_drop', 5)
+            method_sell = strategy_config.get('method_sell', "bottom")
+            method_buy = strategy_config.get('method_buy', "top")
+            hold_thresh = strategy_config.get('hold_thresh', 1)
+            strategy_kwargs.update({
+                "topk": topk,
+                "n_drop": n_drop,
+                "method_sell": method_sell,
+                "method_buy": method_buy,
+                "hold_thresh": hold_thresh,
+                "only_tradable": strategy_config.get('only_tradable', False),
+                "forbid_all_trade_at_limit": strategy_config.get('forbid_all_trade_at_limit', True),
+            })
+        elif strategy_type == 'SoftTopkStrategy':
+            topk = strategy_config.get('topk', 50)
+            risk_degree = strategy_config.get('risk_degree', 0.95)
+            trade_impact_limit = strategy_config.get('trade_impact_limit')
+            max_sold_weight = strategy_config.get('max_sold_weight', 1.0)
+            buy_method = strategy_config.get('buy_method', "first_fill")
+            strategy_kwargs.update({
+                "topk": topk,
+                "risk_degree": risk_degree,
+                "trade_impact_limit": trade_impact_limit,
+                "max_sold_weight": max_sold_weight,
+                "buy_method": buy_method,
+            })
+        elif strategy_type == 'EnhancedIndexingStrategy':
+            riskmodel_root = strategy_config.get('riskmodel_root')
+            if not riskmodel_root:
+                raise ValueError("EnhancedIndexingStrategy requires 'riskmodel_root' parameter. "                    "Currently, Web interface does not fully support EnhancedIndexingStrategy. "                    "Please use TopkDropoutStrategy or SoftTopkStrategy for backtesting."                )
+            
+            strategy_kwargs.update({
+                "riskmodel_root": riskmodel_root,
+                "market": strategy_config.get('market', "csi500"),
+                "turn_limit": strategy_config.get('turn_limit'),
+                "optimizer_kwargs": strategy_config.get('optimizer_kwargs', {}),
+                })    
 
         # Extract exchange config
         exchange_kwargs = backtest_config.get('exchange_kwargs', {})
         logger.info(f'Exchange kwargs from config: {exchange_kwargs}')
+        logger.info(f'Strategy type: {strategy_type}, kwargs: {strategy_kwargs}')
 
         # Build configuration
         config = {
@@ -625,12 +670,8 @@ class QLibWrapper:
             },
             "strategy": {
                 "class": strategy_type,
-                "module_path": "qlib.contrib.strategy.signal_strategy",
-                "kwargs": {
-                    "signal": pred,
-                    "topk": topk,
-                    "n_drop": n_drop,
-                },
+                "module_path": strategy_module_path,
+                "kwargs": strategy_kwargs,
             },
             "backtest": {
                 "start_time": backtest_config.get('start_time', '2017-01-01'),

@@ -9,8 +9,32 @@ import queue
 import logging
 from typing import Dict, Optional, Callable
 from datetime import datetime
+import json
+import math
 
 logger = logging.getLogger(__name__)
+
+
+def _clean_nan_values(obj):
+    """
+    Recursively clean NaN values from objects for JSON serialization
+
+    Args:
+        obj: Any object (dict, list, or primitive)
+
+    Returns:
+        Object with NaN values replaced with None
+    """
+    if isinstance(obj, dict):
+        return {k: _clean_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_clean_nan_values(v) for v in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj):
+            return None
+        return obj
+    else:
+        return obj
 
 
 class TaskStatus:
@@ -126,7 +150,7 @@ class Task:
             'status': self.status,
             'progress': self.progress,
             'message': self.message,
-            'result': self.result,
+            'result': _clean_nan_values(self.result),
             'error': self.error,
             'created_at': self.created_at,
             'started_at': self.started_at,
