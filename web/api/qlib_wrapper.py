@@ -759,7 +759,7 @@ class QLibWrapper:
         excess_returns = strategy_returns - report_normal['bench']
 
         risk_metrics = risk_analysis(excess_returns, freq='day')
-        logger.error(f'risk_metrics : {risk_metrics['risk']}')
+        logger.error(f'risk_metrics : {risk_metrics}')
         # Extract metrics - risk_analysis returns a Series with risk metrics as values
         annual_return = risk_metrics['risk']['annualized_return']
         sharpe_ratio = risk_metrics['risk']['information_ratio']

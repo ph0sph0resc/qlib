@@ -248,7 +248,7 @@ async function loadModelInfo() {
     }
 }
 
-async function run() {
+async function runBacktest() {
     const modelId = document.getElementById('backtest-model').value;
     if (!modelId) {
         showAlert('请先选择一个模型', 'warning');

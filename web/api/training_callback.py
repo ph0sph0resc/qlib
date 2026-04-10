@@ -116,7 +116,7 @@ class TrainingProgressCallback:
     and update a web task object with progress information.
     """
 
-    def __init__(self, task=None, total_epochs:预估int = 100):
+    def __init__(self, task=None, total_epochs= 100):
         """
         Initialize the callback
 
