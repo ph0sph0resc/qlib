@@ -284,16 +284,40 @@ class QLibWrapper:
 
                 metrics_history['epochs'].append(current_step[0])
 
+                # 添加调试日志，记录捕获的指标
+                captured_metrics = {}
                 for name, value in kwargs.items():
-                    # Normalize metric names
-                    if 'train' in name.lower() and 'loss' in name.lower():
-                        metrics_history['train_loss'].append(float(value))
-                    elif 'valid' in name.lower() and 'loss' in name.lower():
-                        metrics_history['valid_loss'].append(float(value))
-                    elif 'train' in name.lower() and ('score' in name.lower() or 'ic' in name.lower()):
-                        metrics_history['train_score'].append(float(value))
-                    elif 'valid' in name.lower() and ('score' in name.lower() or 'ic' in name.lower()):
-                        metrics_history['valid_score'].append(float(value))
+                    # 记录所有原始指标名称用于调试
+                    logger.info(f"Raw metric at step {current_step[0]}: {name}={value}")
+
+                    # Normalize metric names - 支持多种格式
+                    name_lower = name.lower()
+                    value_float = float(value)
+
+                    # 捕获训练损失 - 支持多种名称格式
+                    # 可能的格式: train.l1, l1_train, train_loss, train_mse 等
+                    if 'train' in name_lower and any(k in name_lower for k in ['loss', 'l1', 'l2', 'mse', 'rmse', 'mae']):
+                        metrics_history['train_loss'].append(value_float)
+                        captured_metrics['train_loss'] = value_float
+
+                    # 捕获验证损失 - 支持多种名称格式
+                    # 可能的格式: valid.l1, valid_l1, valid_loss, valid_mse 等
+                    elif 'valid' in name_lower and any(k in name_lower for k in ['loss', 'l1', 'l2', 'mse', 'rmse', 'mae']):
+                        metrics_history['valid_loss'].append(value_float)
+                        captured_metrics['valid_loss'] = value_float
+
+                    # 捕获训练分数/IC
+                    elif 'train' in name_lower and any(k in name_lower for k in ['score', 'ic', 'pearson', 'rank']):
+                        metrics_history['train_score'].append(value_float)
+                        captured_metrics['train_score'] = value_float
+
+                    # 捕获验证分数/IC
+                    elif 'valid' in name_lower and any(k in name_lower for k in ['score', 'ic', 'pearson', 'rank']):
+                        metrics_history['valid_score'].append(value_float)
+                        captured_metrics['valid_score'] = value_float
+
+                if captured_metrics:
+                    logger.debug(f"Captured metrics at step {current_step[0]}: {captured_metrics}")
 
                 # Update task progress
                 if task and total_epochs > 0:
@@ -323,8 +347,22 @@ class QLibWrapper:
             # Extract results from recorder
             results = self._extract_training_results(recorder, model_class, task_config)
             logger.info(f'results={results}')
-            # Add the captured metrics history
+            # Add captured metrics history
             if metrics_history['epochs']:
+                # 验证所有数组长度一致性
+                epoch_count = len(metrics_history['epochs'])
+                for key in ['train_loss', 'valid_loss', 'train_score', 'valid_score']:
+                    if len(metrics_history[key]) == 0:
+                        logger.warning(f"Empty metrics array: {key}")
+                    elif len(metrics_history[key]) != epoch_count:
+                        logger.warning(f"Metrics length: {key} has {len(metrics_history[key])}, expected {epoch_count}")
+
+                logger.info(f"Training history captured: {epoch_count} epochs, "
+                          f"train_loss: {len(metrics_history['train_loss'])}, "
+                          f"valid_loss: {len(metrics_history['valid_loss'])}, "
+                          f"train_score: {len(metrics_history['train_score'])}, "
+                          f"valid_score: {len(metrics_history['valid_score'])}")
+
                 results['training_history'] = {
                     'epochs': metrics_history['epochs'],
                     'train_loss': metrics_history['train_loss'],
@@ -332,8 +370,10 @@ class QLibWrapper:
                     'train_score': metrics_history['train_score'],
                     'valid_score': metrics_history['valid_score']
                 }
+            else:
+                logger.warning("No training history captured")
+                results['training_history'] = None
 
-            # Add model info
             results['model'] = recorder.id
             results['model_class'] = model_class
             results['recorder_id'] = recorder.id
@@ -342,10 +382,13 @@ class QLibWrapper:
             # Calculate final scores
             training_history = results.get('training_history')
             if training_history:
-                if results['training_history']['valid_score']:
-                    results['valid_score'] = results['training_history']['valid_score'][-1]
-                if results['training_history']['train_score']:
-                    results['train_score'] = results['training_history']['train_score'][-1]
+                # 检查数组是否存在且不为空
+                if 'valid_score' in training_history and len(training_history['valid_score']) > 0:
+                    results['valid_score'] = training_history['valid_score'][-1]
+                    logger.info(f"Set valid_score from training_history: {results['valid_score']}")
+                if 'train_score' in training_history and len(training_history['train_score']) > 0:
+                    results['train_score'] = training_history['train_score'][-1]
+                    logger.info(f"Set train_score from training_history: {results['train_score']}")
 
             # Fill missing scores
             if 'valid_score' not in results:

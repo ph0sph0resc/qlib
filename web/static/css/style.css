@@ -293,3 +293,20 @@ canvas {
 .empty-state-description {
     font-size: 0.875rem;
 }
+
+/* Text break for long IDs */
+.text-break {
+    word-break: break-all;
+    max-width: 200px;
+    display: inline-block;
+}
+
+/* Training summary styles */
+.training-summary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.training-summary .metric-value {
+    color: white;
+}

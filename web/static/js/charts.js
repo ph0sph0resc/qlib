@@ -413,31 +413,56 @@ function initFactorTestCharts() {
  * Initialize training charts with demo data
  */
 function initTrainingCharts() {
-    // Training loss
-    createTrainingLossChart('train-loss-chart',
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        [0.5, 0.3, 0.25, 0.2, 0.18, 0.15, 0.14, 0.13, 0.12, 0.12],
-        [0.45, 0.28, 0.24, 0.22, 0.2, 0.19, 0.18, 0.18, 0.17, 0.17]
-    );
+    // 显示空状态而非演示数据
+    showEmptyChartState('train-loss-chart', '等待训练数据...');
+    showEmptyChartState('valid-metrics-chart', '等待训练数据...');
+    showEmptyChartState('feature-importance-chart', '等待训练数据...');
+}
 
-    // Validation metrics
-    createLineChart('valid-metrics-chart',
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        [{
-            label: '验证分数',
-            data: [0.7, 0.75, 0.78, 0.8, 0.81, 0.82, 0.825, 0.828, 0.83, 0.832],
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-            fill: false,
-            tension: 0.1
-        }]
-    );
+/**
+ * Show empty chart state with message
+ */
+function showEmptyChartState(canvasId, message) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
 
-    // Feature importance
-    const features = ['factor1', 'factor2', 'factor3', 'factor4', 'factor5',
-                     'factor6', 'factor7', 'factor8', 'factor9', 'factor10'];
-    const importance = [0.3, 0.25, 0.2, 0.15, 0.1, 0.08, 0.06, 0.05, 0.04, 0.03];
-    createFeatureImportanceChart('feature-importance-chart', features, importance);
+    // Destroy existing chart
+    if (charts[canvasId]) {
+        charts[canvasId].destroy();
+    }
+
+    charts[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: []
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: message,
+                    font: {
+                        size: 16,
+                        style: 'italic'
+                    },
+                    color: '#6c757d'
+                }
+            },
+            scales: {
+                x: {
+                    display: false
+                },
+                y: {
+                    display: false
+                }
+            }
+        }
+    });
 }
 
 /**

@@ -123,6 +123,57 @@
         </div>
     </div>
     <div class="col-md-8">
+        <!-- 训练摘要卡片 -->
+        <div class="card mb-3" id="training-summary-card" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title">训练摘要</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <h6 class="text-muted mb-1">训练分数</h6>
+                            <h3 class="mb-0" id="summary-train-score">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <h6 class="text-muted mb-1">验证分数</h6>
+                            <h3 class="mb-0" id="summary-valid-score">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <h6 class="text-muted mb-1">测试分数</h6>
+                            <h3 class="mb-0" id="summary-test-score">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="text-center">
+                            <h6 class="text-muted mb-1">训练时间</h6>
+                            <h5 class="mb-0" id="summary-train-time">-</h5>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">模型信息</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><strong>模型类型:</strong> <span id="summary-model-type">-</span></li>
+                            <li><strong>Recorder ID:</strong> <span id="summary-recorder-id" class="text-break">-</span></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">数据集信息</h6>
+                        <ul class="list-unstyled mb-0">
+                            <li><strong>预测形状:</strong> <span id="summary-pred-shape">-</span></li>
+                            <li><strong>标签形状:</strong> <span id="summary-label-shape">-</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="card-title">训练损失曲线</h5>
@@ -157,9 +208,13 @@
 <script>
 let currentTrainTaskId = null;
 let modelParamsCache = {};
+let trainingStartTime = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    initTrainingCharts();
+    // 显示空状态
+    showEmptyChartState('train-loss-chart', '等待训练数据...');
+    showEmptyChartState('valid-metrics-chart', '等待训练数据...');
+    showEmptyChartState('feature-importance-chart', '等待训练数据...');
     loadModelParams('LGBModel'); // 默认加载LightGBM参数
 });
 
@@ -337,6 +392,7 @@ async function startTraining() {
 
         if (result.success) {
             currentTrainTaskId = result.task_id;
+            trainingStartTime = new Date(); // 记录训练开始时间
             showAlert('任务已创建，正在启动...', 'success');
 
             const startResult = await API.post(`/task/${currentTrainTaskId}/start`);
@@ -476,8 +532,66 @@ async function monitorTrainingTask(taskId) {
     }, 2000);
 }
 
+function updateTrainingSummary(results) {
+    // 更新训练摘要卡片
+    const summaryCard = document.getElementById('training-summary-card');
+    if (summaryCard) {
+        summaryCard.style.display = 'block';
+    }
+
+    // 更新分数
+    if (results.train_score !== undefined) {
+        document.getElementById('summary-train-score').textContent = formatNumber(results.train_score, 4);
+    }
+    if (results.valid_score !== undefined) {
+        document.getElementById('summary-valid-score').textContent = formatNumber(results.valid_score, 4);
+    }
+    if (results.test_score !== undefined) {
+        document.getElementById('summary-test-score').textContent = formatNumber(results.test_score, 4);
+    } else {
+        document.getElementById('summary-test-score').textContent = '-';
+    }
+
+    // 计算并显示训练时间
+    if (trainingStartTime) {
+        const endTime = new Date();
+        const duration = (endTime - trainingStartTime) / 1000; // 秒
+        const minutes = Math.floor(duration / 60);
+        const seconds = Math.floor(duration % 60);
+        document.getElementById('summary-train-time').textContent = 
+            minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+    }
+
+    // 更新模型信息
+    if (results.model_class) {
+        document.getElementById('summary-model-type').textContent = results.model_class;
+    }
+    if (results.recorder_id) {
+        document.getElementById('summary-recorder-id').textContent = results.recorder_id;
+    }
+
+    // 更新数据集信息
+    if (results.prediction_shape) {
+        document.getElementById('summary-pred-shape').textContent = 
+            Array.isArray(results.prediction_shape) 
+                ? results.prediction_shape.join(' × ') 
+                : results.prediction_shape;
+    }
+    if (results.label_shape) {
+        document.getElementById('summary-label-shape').textContent = 
+            Array.isArray(results.label_shape) 
+                ? results.label_shape.join(' × ') 
+                : results.label_shape;
+    }
+}
+
 function displayTrainingResults(results) {
+    console.log('Displaying training results:', results);
+
     if (results) {
+        // 更新训练摘要
+        updateTrainingSummary(results);
+
         // 更新训练指标显示
         if (results.train_score !== undefined) {
             showAlert(`训练得分: ${formatNumber(results.train_score, 4)}`, 'success');
@@ -490,16 +604,19 @@ function displayTrainingResults(results) {
         }
 
         // 更新特征重要性图表
-        if (results.feature_importance) {
+        if (results.feature_importance && Object.keys(results.feature_importance).length > 0) {
             const features = Object.keys(results.feature_importance);
             const importance = Object.values(results.feature_importance);
             createFeatureImportanceChart('feature-importance-chart', features, importance);
+        } else {
+            showEmptyChartState('feature-importance-chart', '无特征重要性数据');
         }
 
         // 更新训练历史图表
         if (results.training_history) {
             const history = results.training_history;
-            const epochs = history.epochs;
+            console.log('Training history:', history);
+            const epochs = history.epochs || [];
 
             if (history.train_loss && history.train_loss.length > 0) {
                 const datasets = [{
@@ -523,6 +640,8 @@ function displayTrainingResults(results) {
                 }
 
                 createLineChart('train-loss-chart', epochs, datasets);
+            } else {
+                showEmptyChartState('train-loss-chart', '训练未记录损失数据');
             }
 
             if (history.train_score && history.train_score.length > 0) {
@@ -547,7 +666,13 @@ function displayTrainingResults(results) {
                 }
 
                 createLineChart('valid-metrics-chart', epochs, datasets);
+            } else {
+                showEmptyChartState('valid-metrics-chart', '训练未记录分数数据');
             }
+        } else {
+            console.warn('No training history in results');
+            showEmptyChartState('train-loss-chart', '训练未记录历史数据');
+            showEmptyChartState('valid-metrics-chart', '训练未记录历史数据');
         }
     }
 }
