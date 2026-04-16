@@ -25,8 +25,12 @@ def get_rebalance_history(task_id: str) -> dict:
         import pickle
         from pathlib import Path
         import json
-
+        import yaml
         experiment = Experiment.query.get(task_id)
+        data = yaml.safe_load(experiment.config)  # Ensure config is valid YAML
+        model_id = data['model_id']
+
+        logger.info(f'Fetching rebalance history for task_id={task_id}, experiment found: {model_id}')
         if not experiment:
             return {'success': False, 'error': 'Experiment not found'}
 
@@ -48,9 +52,10 @@ def get_rebalance_history(task_id: str) -> dict:
 
         # If not in results, try to load from pickle file
         if not events:
-            exp_dir = qlib.get_experiment_dir(task_id)
+            exp_dir = qlib.get_experiment_dir(model_id)
+            
             rebalance_file = Path(exp_dir) / 'portfolio_analysis' / 'rebalance_history.pkl'
-
+            logger.info(f'Looking for rebalance history in {rebalance_file}')
             if rebalance_file.exists():
                 with open(rebalance_file, 'rb') as f:
                     history = pickle.load(f)

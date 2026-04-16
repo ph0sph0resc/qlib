@@ -902,6 +902,49 @@ class QLibWrapper:
             logger.error(f'Failed to get experiment results: {e}')
             return {}
 
+    def get_experiment_dir(self, task_id: str) -> Optional[str]:
+        """
+        Get local directory path for an experiment/recorder.
+
+        Args:
+            task_id: Experiment ID or Recorder ID
+
+        Returns:
+            Local directory path or None if not found
+        """
+        if not self._initialized:
+            self.init()
+        try:
+            from qlib.workflow import R
+
+            # Try to load by recorder_id first
+            try:
+                logger.info(f'Loaded recorder by ID: {task_id}')
+                recorder = R.get_recorder(recorder_id=task_id)
+                
+                # Get local directory from recorder
+                return recorder.get_local_dir()
+            except Exception as e:
+                logger.warning(f'Failed to load recorder by ID: {e}')
+
+            # Try to load by experiment_id and get last recorder
+            try:
+                exp = R.get_exp(experiment_id=task_id)
+                recorders = exp.list_recorders()
+                if recorders:
+                    recorder = exp.get_recorder(recorder_id=recorders[-1].id)
+                    logger.info(f'Loaded last recorder from experiment: {task_id}')
+                    # Get local directory from recorder
+                    return recorder.get_local_dir()
+            except Exception as e:
+                logger.warning(f'Failed to load from experiment: {e}')
+
+            return None
+
+        except Exception as e:
+            logger.error(f'Failed to get experiment directory: {e}')
+            return None
+
     @staticmethod
     def list_examples() -> Dict[str, List[str]]:
         """
