@@ -34,6 +34,7 @@ from api.models import db
 from api.qlib_wrapper import qlib
 from api.config_parser import ConfigParser
 from api.task_manager import task_manager, TaskStatus
+from api import rebalance_api
 
 # Initialize Flask app
 app = Flask(__name__,
@@ -125,6 +126,11 @@ def backtest():
 def analysis():
     """Analysis page"""
     return render_template('analysis.html')
+
+@app.route('/rebalance_analysis')
+def rebalance_analysis():
+    """Rebalance analysis page"""
+    return render_template('rebalance_analysis.html')
 
 
 # ============================================================================
@@ -446,6 +452,59 @@ def internal_error(error):
     logger.error(f'Internal error: {error}')
     return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
+
+
+
+
+# ============================================================================
+# API Routes - Rebalance
+# ============================================================================
+@app.route('/api/rebalance/history')
+def api_rebalance_history():
+    """Get rebalance history for a backtest task"""
+    logger.info(f'api_rebalance_history called with task_id={request.args.get("task_id")}')
+    return jsonify(rebalance_api.get_rebalance_history(request.args.get('task_id')))
+
+
+
+
+@app.route('/api/rebalance/summary')
+def api_rebalance_summary():
+    """Get rebalance summary for a backtest task"""
+    task_id = request.args.get('task_id')
+    history_response = rebalance_api.get_rebalance_history(task_id)
+    return jsonify({
+        'success': history_response.get('success'),
+        'summary': history_response.get('summary', {})
+    })
+
+
+@app.route('/api/rebalance/export')
+def api_rebalance_export():
+    """Export rebalance history as CSV or Excel"""
+    try:
+        import io
+        task_id = request.args.get('task_id')
+        export_format = request.args.get('format', 'csv')
+
+        if not task_id:
+            return jsonify({'success': False, 'error': 'task_id parameter required'}), 400
+
+        result = rebalance_api.export_rebalance_history(task_id, export_format)
+        if result:
+            data, filename, mimetype = result
+            return send_file(
+                io.BytesIO(data.encode('utf-8')),
+                mimetype=mimetype,
+                as_attachment=True,
+                download_name=filename
+            )
+
+        return jsonify({'success': False, 'error': 'Failed to export rebalance history'}), 400
+
+    except Exception as e:
+        logger.error(f'Rebalance export error: {e}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 # ============================================================================
 # Main

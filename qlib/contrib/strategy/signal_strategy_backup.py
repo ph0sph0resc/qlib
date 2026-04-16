@@ -1,3 +1,4 @@
+from qlib.backtest.rebalance_recorder import rebalance_recorder
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 import os
@@ -17,8 +18,6 @@ from qlib.backtest.position import Position
 from qlib.backtest.signal import Signal, create_signal_from
 from qlib.backtest.decision import Order, OrderDir, TradeDecisionWO
 from qlib.log import get_module_logger
-
-logger = get_module_logger("signal_strategy")
 from qlib.utils import get_pre_trading_date, load_dataset
 from qlib.contrib.strategy.order_generator import OrderGenerator, OrderGenWOInteract
 from qlib.contrib.strategy.optimizer import EnhancedIndexingOptimizer
@@ -329,9 +328,6 @@ class WeightStrategyBase(BaseSignalStrategy):
         else:
             self.order_generator: OrderGenerator = order_generator_cls_or_obj
 
-        # Store last rebalance event data for updating position_after in post_exe_step
-        self._last_rebalance_event = None
-
     def generate_target_weight_position(self, score, current, trade_start_time, trade_end_time):
         """
         Generate target position from score for this date and the current position.The cash is not considered in the position
@@ -374,101 +370,7 @@ class WeightStrategyBase(BaseSignalStrategy):
             trade_start_time=trade_start_time,
             trade_end_time=trade_end_time,
         )
-
-        # Record rebalance event if enabled
-        try:
-            from qlib.backtest.rebalance_recorder import rebalance_recorder
-            if rebalance_recorder.is_enabled() and order_list:
-                # Get position before trading
-                position_before = self.trade_position.get_stock_weight_dict(only_stock=False)
-                cash_before = self.trade_position.get_cash()
-
-                # Separate buy and sell orders
-                buy_orders = []
-                sell_orders = []
-                for order in order_list:
-                    if order.direction == Order.BUY:
-                        buy_orders.append(order)
-                    elif order.direction == Order.SELL:
-                        sell_orders.append(order)
-
-                # Only record if there are actual trades
-                if buy_orders or sell_orders:
-                    trade_date_str = trade_start_time.strftime("%Y-%m-%d")
-
-                    # Calculate buy and sell amounts
-                    buy_amounts = {order.stock_id: order.amount for order in buy_orders}
-                    sell_amounts = {order.stock_id: order.amount for order in sell_orders}
-
-                    # Calculate total value
-                    total_value = cash_before + sum(position_before.values())
-
-                    # Store rebalance event data for later update in post_exe_step
-                    self._last_rebalance_event = {
-                        'date': trade_date_str,
-                        'trade_step': trade_step,
-                        'stocks_to_buy': [order.stock_id for order in buy_orders],
-                        'stocks_to_sell': [order.stock_id for order in sell_orders],
-                        'buy_amounts': buy_amounts,
-                        'sell_amounts': sell_amounts,
-                        'position_before': position_before,
-                        'cash_before': cash_before,
-                        'total_value': total_value
-                    }
-                else:
-                    self._last_rebalance_event = None
-            else:
-                self._last_rebalance_event = None
-        except ImportError:
-            # rebalance_recorder module not available, skip recording
-            self._last_rebalance_event = None
-        except Exception as e:
-            # Log any errors but don't break backtest
-            logger = get_module_logger("WeightStrategyBase")
-            logger.warning(f"Failed to record rebalance: {e}")
-            self._last_rebalance_event = None
-
         return TradeDecisionWO(order_list, self)
-
-    def post_exe_step(self, execute_result=None):
-        """
-        Update rebalance record after trade execution.
-
-        This method is called after orders are executed, allowing us to capture
-        the final position and cash after rebalancing.
-        """
-        if self._last_rebalance_event is not None:
-            try:
-                from qlib.backtest.rebalance_recorder import rebalance_recorder
-                if rebalance_recorder.is_enabled():
-                    # Get position after trading
-                    position_after = self.trade_position.get_stock_weight_dict(only_stock=False)
-                    cash_after = self.trade_position.get_cash()
-
-                    # Update the rebalance record with final values
-                    rebalance_recorder.record_rebalance(
-                        date=self._last_rebalance_event['date'],
-                        trade_step=self._last_rebalance_event['trade_step'],
-                        stocks_to_buy=self._last_rebalance_event['stocks_to_buy'],
-                        stocks_to_sell=self._last_rebalance_event['stocks_to_sell'],
-                        buy_amounts=self._last_rebalance_event['buy_amounts'],
-                        sell_amounts=self._last_rebalance_event['sell_amounts'],
-                        position_before=self._last_rebalance_event['position_before'],
-                        position_after=position_after,
-                        cash_before=self._last_rebalance_event['cash_before'],
-                        cash_after=cash_after,
-                        total_value=self._last_rebalance_event['total_value']
-                    )
-            except ImportError:
-                # rebalance_recorder module not available, skip recording
-                pass
-            except Exception as e:
-                # Log any errors but don't break backtest
-                logger = get_module_logger("WeightStrategyBase")
-                logger.warning(f"Failed to update rebalance record: {e}")
-
-        # Clear the last rebalance event
-        self._last_rebalance_event = None
 
 
 class EnhancedIndexingStrategy(WeightStrategyBase):

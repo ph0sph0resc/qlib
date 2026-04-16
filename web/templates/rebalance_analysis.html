@@ -1,0 +1,813 @@
+{% extends "base.html" %}
+
+{% block title %}调仓分析 - QLib量化投资平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">筛选控制</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="backtest-select" class="form-label">选择回测任务</label>
+                    <select class="form-select" id="backtest-select" onchange="onBacktestChanged()">
+                        <option value="">请选择回测任务...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="start-date" class="form-label">开始日期</label>
+                    <input type="date" class="form-control" id="start-date">
+                </div>
+                <div class="mb-3">
+                    <label for="end-date" class="form-label">结束日期</label>
+                    <input type="date" class="form-control" id="end-date">
+                </div>
+                <div class="mb-3">
+                    <label for="stock-code" class="form-label">股票代码</label>
+                    <input type="text" class="form-control" id="stock-code" placeholder="例如: sh600000">
+                </div>
+                <div class="mb-3">
+                    <label for="min-turnover" class="form-label">最小周转率</label>
+                    <input type="range" class="form-control" id="min-turnover" min="0" max="100000000" step="1000">
+                    <div class="text-center"><span id="min-turnover-value">0</span></div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <button type="button" class="btn btn-primary w-100 mb-2" onclick="applyFilters()">应用筛选</button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" class="btn btn-secondary w-100 mb-2" onclick="resetFilters()">重置</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <button type="button" class="btn btn-success w-100" onclick="exportCSV()">导出 CSV</button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" class="btn btn-success w-100" onclick="exportExcel()">导出 Excel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title">统计摘要</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="summary-cards">
+                    <div class="col-md-4 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">总调仓次数</h6>
+                                <h5 class="text-primary" id="total-rebalances">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">平均周转率</h6>
+                                <h5 class="text-success" id="avg-turnover">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">最大周转率</h6>
+                                <h5 class="text-warning" id="max-turnover">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">总买入金额</h6>
+                                <h5 class="text-info" id="total-buy-amount">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">总卖出金额</h6>
+                                <h5 class="text-danger" id="total-sell-amount">--</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <!-- 调仓时间线图表 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">调仓时间线</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="timeline-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 持仓变化趋势图表 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">持仓变化趋势</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="position-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 调仓频率分析图表 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">调仓频率分析</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="frequency-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 交易金额图表 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">交易金额分析</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="amount-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 换手率分析图表 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">换手率分析</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="turnover-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 调仓明细表格 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">调仓明细</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="search-input" placeholder="搜索股票代码..." onkeyup="searchTable()">
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <span class="text-muted" id="table-info">共 0 条记录</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>交易步骤</th>
+                                <th>买入股票</th>
+                                <th>卖出股票</th>
+                                <th>买入金额</th>
+                                <th>卖出金额</th>
+                                <th>周转率</th>
+                                <th>调仓前现金</th>
+                                <th>调仓后现金</th>
+                                <th>组合价值</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-table">
+                            <tr>
+                                <td colspan="11" class="text-center">请选择回测任务</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <nav>
+                    <ul class="pagination justify-content-center" id="pagination">
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+let currentTaskId = null;
+let allEvents = [];
+let filteredEvents = [];
+let currentPage = 1;
+let pageSize = 50;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadBacktestTasks();
+    initCharts();
+
+    // 更新最小周转率显示
+    document.getElementById('min-turnover').addEventListener('input', function() {
+        document.getElementById('min-turnover-value').textContent = this.value;
+    });
+});
+
+async function loadBacktestTasks() {
+    try {
+        const result = await API.get('/analysis/list', {
+            task_type: 'backtest',
+            status: 'completed',
+            page_size: 100
+        });
+
+        if (result.success && result.experiments) {
+            const select = document.getElementById('backtest-select');
+            select.innerHTML = '<option value="">请选择回测任务...</option>';
+
+            result.experiments.forEach(exp => {
+                const option = document.createElement('option');
+                option.value = exp.id;
+                const displayName = exp.name || '未命名回测';
+                option.textContent = `${displayName} (${exp.id.substring(0, 8)})`;
+                select.appendChild(option);
+            });
+        } else {
+            showAlert('加载回测任务失败', 'danger');
+        }
+    } catch (error) {
+        console.error('Failed to load backtest tasks:', error);
+        showAlert('加载回测任务失败', 'danger');
+    }
+}
+
+function onBacktestChanged() {
+    currentTaskId = document.getElementById('backtest-select').value;
+    if (currentTaskId) {
+        loadRebalanceHistory();
+    } else {
+        resetData();
+    }
+}
+
+async function loadRebalanceHistory() {
+    if (!currentTaskId) return;
+
+    try {
+        showAlert('正在加载调仓数据...', 'info');
+
+        const result = await API.get('/rebalance/history', {
+            task_id: currentTaskId
+        });
+
+        if (result.success) {
+            allEvents = result.events || [];
+            filteredEvents = [...allEvents];
+
+            updateSummary(result.summary);
+            renderCharts();
+            renderTable();
+            showAlert('调仓数据已加载', 'success');
+        } else {
+            showAlert('加载调仓数据失败: ' + (result.error || '未知错误'), 'danger');
+        }
+    } catch (error) {
+        console.error('Failed to load rebalance history:', error);
+        showAlert('加载调仓数据失败', 'danger');
+    }
+}
+
+function applyFilters() {
+    if (!currentTaskId) {
+        showAlert('请先选择回测任务', 'warning');
+        return;
+    }
+
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const stockCode = document.getElementById('stock-code').value;
+    const minTurnover = parseFloat(document.getElementById('min-turnover').value);
+
+    filteredEvents = allEvents.filter(event => {
+        if (startDate && event.date < startDate) return false;
+        if (endDate && event.date > endDate) return false;
+        if (stockCode && !event.stocks_to_buy.includes(stockCode) && !event.stocks_to_sell.includes(stockCode)) return false;
+        if (minTurnover && event.turnover < minTurnover) return false;
+        return true;
+    });
+
+    updateSummary(calculateSummary(filteredEvents));
+    renderCharts();
+    renderTable();
+    showAlert('筛选已应用', 'success');
+}
+
+function resetFilters() {
+    document.getElementById('start-date').value = '';
+    document.getElementById('end-date').value = '';
+    document.getElementById('stock-code').value = '';
+    document.getElementById('min-turnover').value = '0';
+    document.getElementById('min-turnover-value').textContent = '0';
+
+    if (currentTaskId) {
+        filteredEvents = [...allEvents];
+        updateSummary(calculateSummary(filteredEvents));
+        renderCharts();
+        renderTable();
+    }
+}
+
+function resetData() {
+    allEvents = [];
+    filteredEvents = [];
+    currentPage = 1;
+
+    document.getElementById('total-rebalances').textContent = '--';
+    document.getElementById('avg-turnover').textContent = '--';
+    document.getElementById('max-turnover').textContent = '--';
+    document.getElementById('total-buy-amount').textContent = '--';
+    document.getElementById('total-sell-amount').textContent = '--';
+
+    destroyCharts();
+    document.getElementById('detail-table').innerHTML = '<tr><td colspan="11" class="text-center">请选择回测任务</td></tr>';
+    document.getElementById('table-info').textContent = '共 0 条记录';
+}
+
+function updateSummary(summary) {
+    if (summary) {
+        document.getElementById('total-rebalances').textContent = summary.total_rebalances || 0;
+        document.getElementById('avg-turnover').textContent = formatNumber(summary.avg_turnover || 0, 2);
+        document.getElementById('max-turnover').textContent = formatNumber(summary.max_turnover || 0, 2);
+        document.getElementById('total-buy-amount').textContent = formatLargeNumber(summary.total_buy_amount || 0);
+        document.getElementById('total-sell-amount').textContent = formatLargeNumber(summary.total_sell_amount || 0);
+    }
+}
+
+function calculateSummary(events) {
+    if (!events || events.length === 0) {
+        return {
+            total_rebalances: 0,
+            avg_turnover: 0,
+            max_turnover: 0,
+            total_buy_amount: 0,
+            total_sell_amount: 0
+        };
+    }
+
+    const turnovers = events.map(e => e.turnover);
+    return {
+        total_rebalances: events.length,
+        avg_turnover: turnovers.reduce((a, b) => a + b, 0) / events.length,
+        max_turnover: Math.max(...turnovers),
+        total_buy_amount: events.reduce((sum, e) => sum + Object.values(e.buy_amounts).reduce((a, b) => a + b, 0), 0),
+        total_sell_amount: events.reduce((sum, e) => sum + Object.values(e.sell_amounts).reduce((a, b) => a + b, 0), 0)
+    };
+}
+
+function renderTable() {
+    const tbody = document.getElementById('detail-table');
+
+    if (!filteredEvents || filteredEvents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center">暂无调仓记录</td></tr>';
+        document.getElementById('table-info').textContent = '共 0 条记录';
+        return;
+    }
+
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageData = filteredEvents.slice(start, end);
+
+    tbody.innerHTML = pageData.map(event => {
+        const buyStocks = event.stocks_to_buy.join(', ');
+        const sellStocks = event.stocks_to_sell.join(', ');
+        const buyAmount = Object.values(event.buy_amounts).reduce((a, b) => a + b, 0);
+        const sellAmount = Object.values(event.sell_amounts).reduce((a, b) => a + b, 0);
+
+        return `
+            <tr>
+                <td>${event.date}</td>
+                <td>${event.trade_step}</td>
+                <td><span class="badge bg-success">${buyStocks}</span></td>
+                <td><span class="badge bg-danger">${sellStocks}</span></td>
+                <td>${formatLargeNumber(buyAmount)}</td>
+                <td>${formatLargeNumber(sellAmount)}</td>
+                <td>${formatLargeNumber(event.turnover)}</td>
+                <td>${formatLargeNumber(event.cash_before)}</td>
+                <td>${formatLargeNumber(event.cash_after)}</td>
+                <td>${formatLargeNumber(event.total_value)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    document.getElementById('table-info').textContent = `共 ${filteredEvents.length} 条记录`;
+    renderPagination();
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(filteredEvents.length / pageSize);
+    const pagination = document.getElementById('pagination');
+
+    let html = '';
+
+    if (totalPages > 1) {
+        html += `<li class="page-item ${currentPage === 1 ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(1)">第一页</a>
+        </li>`;
+
+        if (currentPage > 1) {
+            html += `<li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">上一页</a>
+            </li>`;
+        }
+
+        html += `<li class="page-item active">
+            <span class="page-link">${currentPage} / ${totalPages}</span>
+        </li>`;
+
+        if (currentPage < totalPages) {
+            html += `<li class="page-item">
+                <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">下一页</a>
+            </li>`;
+        }
+
+        html += `<li class="page-item ${currentPage === totalPages ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${totalPages})">末页</a>
+        </li>`;
+    }
+
+    pagination.innerHTML = html;
+}
+
+function changePage(page) {
+    currentPage = page;
+    renderTable();
+}
+
+function searchTable() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+
+    if (!searchTerm) {
+        filteredEvents = [...allEvents];
+    } else {
+        filteredEvents = allEvents.filter(event => {
+            const buyStocks = event.stocks_to_buy.join(' ').toLowerCase();
+            const sellStocks = event.stocks_to_sell.join(' ').toLowerCase();
+            return buyStocks.includes(searchTerm) || sellStocks.includes(searchTerm);
+        });
+    }
+
+    currentPage = 1;
+    updateSummary(calculateSummary(filteredEvents));
+    renderCharts();
+    renderTable();
+}
+
+let timelineChart = null;
+let positionChart = null;
+let frequencyChart = null;
+let amountChart = null;
+let turnoverChart = null;
+
+function initCharts() {
+    // Initialize empty charts
+    createTimelineChart([], []);
+    createPositionChart([], [], []);
+    createFrequencyChart({}, []);
+    createAmountChart([], [], []);
+    createTurnoverChart([], [], []);
+}
+
+function destroyCharts() {
+    if (timelineChart) timelineChart.destroy();
+    if (positionChart) positionChart.destroy();
+    if (frequencyChart) frequencyChart.destroy();
+    if (amountChart) amountChart.destroy();
+    if (turnoverChart) turnoverChart.destroy();
+}
+
+function renderCharts() {
+    if (!filteredEvents || filteredEvents.length === 0) {
+        destroyCharts();
+        return;
+    }
+
+    // 准备数据
+    const dates = filteredEvents.map(e => e.date);
+    const turnovers = filteredEvents.map(e => e.turnover);
+    const positionValues = filteredEvents.map(e => e.total_value);
+    const cashValues = filteredEvents.map(e => e.cash_after);
+    const buyAmounts = filteredEvents.map(e => Object.values(e.buy_amounts).reduce((a, b) => a + b, 0));
+    const sellAmounts = filteredEvents.map(e => Object.values(e.sell_amounts).reduce((a, b) => a + b, 0));
+
+    // 按月统计调仓频率
+    const monthlyFrequency = {};
+    filteredEvents.forEach(event => {
+        const month = event.date.substring(0, 7);
+        monthlyFrequency[month] = (monthlyFrequency[month] || 0) + 1;
+    });
+    const monthlyLabels = Object.keys(monthlyFrequency).sort();
+    const monthlyData = monthlyLabels.map(month => monthlyFrequency[month]);
+
+    createTimelineChart(dates, turnovers);
+    createPositionChart(dates, positionValues, cashValues);
+    createFrequencyChart(monthlyLabels, monthlyData);
+    createAmountChart(dates, buyAmounts, sellAmounts);
+    createTurnoverChart(dates, turnovers);
+}
+
+function createTimelineChart(dates, turnovers) {
+    const ctx = document.getElementById('timeline-chart').getContext('2d');
+
+    if (timelineChart) timelineChart.destroy();
+
+    timelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: '周转率',
+                data: turnovers,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '调仓时间线'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `日期: ${context.label}, 周转率: ${formatNumber(context.raw)}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createPositionChart(dates, positionValues, cashValues) {
+    const ctx = document.getElementById('position-chart').getContext('2d');
+
+    if (positionChart) positionChart.destroy();
+
+    positionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: '持仓价值',
+                    data: positionValues,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    yAxisID: 'y'
+                },
+                {
+                    label: '现金',
+                    data: cashValues,
+                    borderColor: 'rgb(255, 193, 7)',
+                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '持仓变化趋势'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: '持仓价值'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: '现金'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createFrequencyChart(labels, data) {
+    const ctx = document.getElementById('frequency-chart').getContext('2d');
+
+    if (frequencyChart) frequencyChart.destroy();
+
+    frequencyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '调仓次数',
+                data: data,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '调仓频率分析 (按月)'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `月份: ${context.label}, 调仓次数: ${context.raw}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '次数'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createAmountChart(dates, buyAmounts, sellAmounts) {
+    const ctx = document.getElementById('amount-chart').getContext('2d');
+
+    if (amountChart) amountChart.destroy();
+
+    amountChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: '买入金额',
+                    data: buyAmounts,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true
+                },
+                {
+                    label: '卖出金额',
+                    data: sellAmounts,
+                    borderColor: 'rgb(255, 193, 7)',
+                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '交易金额分析'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '金额'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createTurnoverChart(dates, turnovers) {
+    const ctx = document.getElementById('turnover-chart').getContext('2d');
+
+    if (turnoverChart) turnoverChart.destroy();
+
+    // 计算平均线
+    const avgTurnover = turnovers.reduce((a, b) => a + b, 0) / turnovers.length;
+    const avgLine = new Array(turnovers.length).fill(avgTurnover);
+
+    turnoverChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: '周转率',
+                    data: turnovers,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1
+                },
+                {
+                    label: '平均周转率',
+                    data: avgLine,
+                    borderColor: 'rgb(255, 193, 7)',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    borderDash: [5, 5],
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: '换手率分析'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `日期: ${context.label}, 周转率: ${formatNumber(context.raw)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '周转率'
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function exportCSV() {
+    if (!currentTaskId) {
+        showAlert('请先选择回测任务', 'warning');
+        return;
+    }
+
+    try {
+        window.location.href = `/api/rebalance/export?task_id=${currentTaskId}&format=csv`;
+    } catch (error) {
+        console.error('Export CSV error:', error);
+        showAlert('导出失败', 'danger');
+    }
+}
+
+async function exportExcel() {
+    if (!currentTaskId) {
+        showAlert('请先选择回测任务', 'warning');
+        return;
+    }
+
+    try {
+        window.location.href = `/api/rebalance/export?task_id=${currentTaskId}&format=xlsx`;
+    } catch (error) {
+        console.error('Export Excel error:', error);
+        showAlert('导出失败', 'danger');
+    }
+}
+</script>
+{% endblock %}

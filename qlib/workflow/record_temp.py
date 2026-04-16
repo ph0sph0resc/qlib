@@ -1,8 +1,3 @@
-#  Copyright (c) Microsoft Corporation.
-#  Licensed under the MIT License.
-
-import logging
-import warnings
 import pandas as pd
 import numpy as np
 from tqdm import trange
@@ -22,7 +17,10 @@ from ..utils.data import deepcopy_basic_type
 from ..utils.exceptions import QlibException
 from ..contrib.eva.alpha import calc_ic, calc_long_short_return, calc_long_short_prec
 
-logger = get_module_logger("workflow", logging.INFO)
+
+
+
+logger = get_module_logger("record_temp")
 
 
 class RecordTemp:
@@ -476,7 +474,7 @@ class PortAnaRecord(ACRecordTemp):
             self.backtest_config["start_time"] = dt_values.min()
         if self.backtest_config["end_time"] is None:
             self.backtest_config["end_time"] = get_date_by_shift(dt_values.max(), -1)
-            warnings.warn(
+            logger.warning(
                 "No explicit backtest end_time provided. "
                 "Qlib requires one extra calendar step to determine the right boundary of a bar. "
                 "Therefore the end_time is shifted backward by one trading day from "
@@ -498,7 +496,7 @@ class PortAnaRecord(ACRecordTemp):
 
         for _analysis_freq in self.risk_analysis_freq:
             if _analysis_freq not in portfolio_metric_dict:
-                warnings.warn(
+                logger.warning(
                     f"the freq {_analysis_freq} report is not found, please set the corresponding env with `generate_portfolio_metrics=True`"
                 )
             else:
@@ -530,7 +528,7 @@ class PortAnaRecord(ACRecordTemp):
 
         for _analysis_freq in self.indicator_analysis_freq:
             if _analysis_freq not in indicator_dict:
-                warnings.warn(f"the freq {_analysis_freq} indicator is not found")
+                logger.warning(f"the freq {_analysis_freq} indicator is not found")
             else:
                 indicators_normal = indicator_dict.get(_analysis_freq)[0]
                 if self.indicator_analysis_method is None:
@@ -547,147 +545,22 @@ class PortAnaRecord(ACRecordTemp):
                 )
                 pprint(f"The following are analysis results of indicators({_analysis_freq}).")
                 pprint(analysis_df)
+
+        # Save rebalance history if available
+        try:
+            from qlib.backtest.rebalance_recorder import rebalance_recorder
+            if rebalance_recorder.is_enabled():
+                rebalance_history = rebalance_recorder.get_history()
+                if rebalance_history:
+                    artifact_objects.update({"rebalance_history.pkl": rebalance_history})
+                    logger.info(
+                        f"Portfolio analysis record 'rebalance_history.pkl' has been saved as artifact of Experiment {self.recorder.experiment_id}"
+                    )
+        except ImportError:
+            # rebalance_recorder module not available, skip saving
+            pass
+        except Exception as e:
+            # Log any errors but don't break backtest
+            logger.warning(f"Failed to save rebalance history: {e}")
+
         return artifact_objects
-
-    def list(self):
-        list_path = []
-        for _freq in self.all_freq:
-            list_path.extend(
-                [
-                    f"report_normal_{_freq}.pkl",
-                    f"positions_normal_{_freq}.pkl",
-                ]
-            )
-        for _analysis_freq in self.risk_analysis_freq:
-            if _analysis_freq in self.all_freq:
-                list_path.append(f"port_analysis_{_analysis_freq}.pkl")
-            else:
-                warnings.warn(f"risk_analysis freq {_analysis_freq} is not found")
-
-        for _analysis_freq in self.indicator_analysis_freq:
-            if _analysis_freq in self.all_freq:
-                list_path.append(f"indicator_analysis_{_analysis_freq}.pkl")
-            else:
-                warnings.warn(f"indicator_analysis freq {_analysis_freq} is not found")
-        return list_path
-
-
-class MultiPassPortAnaRecord(PortAnaRecord):
-    """
-    This is the Multiple Pass Portfolio Analysis Record class that run backtest multiple times and generates the analysis results such as those of backtest. This class inherits the ``PortAnaRecord`` class.
-
-    If shuffle_init_score enabled, the prediction score of the first backtest date will be shuffled, so that initial position will be random.
-    The shuffle_init_score will only works when the signal is used as <PRED> placeholder. The placeholder will be replaced by pred.pkl saved in recorder.
-
-    Parameters
-    ----------
-    recorder : Recorder
-        The recorder used to save the backtest results.
-    pass_num : int
-        The number of backtest passes.
-    shuffle_init_score : bool
-        Whether to shuffle the prediction score of the first backtest date.
-    """
-
-    depend_cls = SignalRecord
-
-    def __init__(self, recorder, pass_num=10, shuffle_init_score=True, **kwargs):
-        """
-        Parameters
-        ----------
-        recorder : Recorder
-            The recorder used to save the backtest results.
-        pass_num : int
-            The number of backtest passes.
-        shuffle_init_score : bool
-            Whether to shuffle the prediction score of the first backtest date.
-        """
-        self.pass_num = pass_num
-        self.shuffle_init_score = shuffle_init_score
-
-        super().__init__(recorder, **kwargs)
-
-        # Save original strategy so that pred df can be replaced in next generate
-        self.original_strategy = deepcopy_basic_type(self.strategy_config)
-        if not isinstance(self.original_strategy, dict):
-            raise QlibException("MultiPassPortAnaRecord require the passed in strategy to be a dict")
-        if "signal" not in self.original_strategy.get("kwargs", {}):
-            raise QlibException("MultiPassPortAnaRecord require the passed in strategy to have signal as a parameter")
-
-    def random_init(self):
-        pred_df = self.load("pred.pkl")
-
-        all_pred_dates = pred_df.index.get_level_values("datetime")
-        bt_start_date = pd.to_datetime(self.backtest_config.get("start_time"))
-        if bt_start_date is None:
-            first_bt_pred_date = all_pred_dates.min()
-        else:
-            first_bt_pred_date = all_pred_dates[all_pred_dates >= bt_start_date].min()
-
-        # Shuffle the first backtest date's pred score
-        first_date_score = pred_df.loc[first_bt_pred_date]["score"]
-        np.random.shuffle(first_date_score.values)
-
-        # Use shuffled signal as the strategy signal
-        self.strategy_config = deepcopy_basic_type(self.original_strategy)
-        self.strategy_config["kwargs"]["signal"] = pred_df
-
-    def _generate(self, **kwargs):
-        risk_analysis_df_map = {}
-
-        # Collect each frequency's analysis df as df list
-        for i in trange(self.pass_num):
-            if self.shuffle_init_score:
-                self.random_init()
-
-            # Not check for cache file list
-            single_run_artifacts = super()._generate(**kwargs)
-
-            for _analysis_freq in self.risk_analysis_freq:
-                risk_analysis_df_list = risk_analysis_df_map.get(_analysis_freq, [])
-                risk_analysis_df_map[_analysis_freq] = risk_analysis_df_list
-
-                analysis_df = single_run_artifacts[f"port_analysis_{_analysis_freq}.pkl"]
-                analysis_df["run_id"] = i
-                risk_analysis_df_list.append(analysis_df)
-
-        result_artifacts = {}
-        # Concat df list
-        for _analysis_freq in self.risk_analysis_freq:
-            combined_df = pd.concat(risk_analysis_df_map[_analysis_freq])
-
-            # Calculate return and information ratio's mean, std and mean/std
-            multi_pass_port_analysis_df = combined_df.groupby(level=[0, 1], group_keys=False).apply(
-                lambda x: pd.Series(
-                    {"mean": x["risk"].mean(), "std": x["risk"].std(), "mean_std": x["risk"].mean() / x["risk"].std()}
-                )
-            )
-
-            # Only look at "annualized_return" and "information_ratio"
-            multi_pass_port_analysis_df = multi_pass_port_analysis_df.loc[
-                (slice(None), ["annualized_return", "information_ratio"]), :
-            ]
-            pprint(multi_pass_port_analysis_df)
-
-            # Save new df
-            result_artifacts.update({f"multi_pass_port_analysis_{_analysis_freq}.pkl": multi_pass_port_analysis_df})
-
-            # Log metrics
-            metrics = flatten_dict(
-                {
-                    "mean": multi_pass_port_analysis_df["mean"].unstack().T.to_dict(),
-                    "std": multi_pass_port_analysis_df["std"].unstack().T.to_dict(),
-                    "mean_std": multi_pass_port_analysis_df["mean_std"].unstack().T.to_dict(),
-                }
-            )
-            self.recorder.log_metrics(**metrics)
-        return result_artifacts
-
-    def list(self):
-        list_path = []
-        for _analysis_freq in self.risk_analysis_freq:
-            if _analysis_freq in self.all_freq:
-                list_path.append(f"multi_pass_port_analysis_{_analysis_freq}.pkl")
-            else:
-                warnings.warn(f"risk_analysis freq {_analysis_freq} is not found")
-        return list_path
