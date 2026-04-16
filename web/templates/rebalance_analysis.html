@@ -295,12 +295,15 @@ function applyFilters() {
     const endDate = document.getElementById('end-date').value;
     const stockCode = document.getElementById('stock-code').value;
     const minTurnover = parseFloat(document.getElementById('min-turnover').value);
-
     filteredEvents = allEvents.filter(event => {
+        
         if (startDate && event.date < startDate) return false;
+        
         if (endDate && event.date > endDate) return false;
+        
         if (stockCode && !event.stocks_to_buy.includes(stockCode) && !event.stocks_to_sell.includes(stockCode)) return false;
         if (minTurnover && event.turnover < minTurnover) return false;
+        //console.error('allEvents.filter', event.date, startDate, endDate, stockCode);
         return true;
     });
 
@@ -311,8 +314,8 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    document.getElementById('start-date').value = '';
-    document.getElementById('end-date').value = '';
+    document.getElementById('start-date').value = '2020-01-01';
+    document.getElementById('end-date').value = '2020-01-30';
     document.getElementById('stock-code').value = '';
     document.getElementById('min-turnover').value = '0';
     document.getElementById('min-turnover-value').textContent = '0';
@@ -480,17 +483,32 @@ function initCharts() {
     // Initialize empty charts
     createTimelineChart([], []);
     createPositionChart([], [], []);
-    createFrequencyChart({}, []);
+    createFrequencyChart([], []);
     createAmountChart([], [], []);
-    createTurnoverChart([], [], []);
+    createTurnoverChart([], []);
 }
 
 function destroyCharts() {
-    if (timelineChart) timelineChart.destroy();
-    if (positionChart) positionChart.destroy();
-    if (frequencyChart) frequencyChart.destroy();
-    if (amountChart) amountChart.destroy();
-    if (turnoverChart) turnoverChart.destroy();
+    if (timelineChart) {
+        timelineChart.destroy();
+        timelineChart = null;
+    }
+    if (positionChart) {
+        positionChart.destroy();
+        positionChart = null;
+    }
+    if (frequencyChart) {
+        frequencyChart.destroy();
+        frequencyChart = null;
+    }
+    if (amountChart) {
+        amountChart.destroy();
+        amountChart = null;
+    }
+    if (turnoverChart) {
+        turnoverChart.destroy();
+        turnoverChart = null;
+    }
 }
 
 function renderCharts() {
@@ -498,6 +516,9 @@ function renderCharts() {
         destroyCharts();
         return;
     }
+
+    // 销毁旧图表
+    destroyCharts();
 
     // 准备数据
     const dates = filteredEvents.map(e => e.date);
@@ -525,8 +546,6 @@ function renderCharts() {
 
 function createTimelineChart(dates, turnovers) {
     const ctx = document.getElementById('timeline-chart').getContext('2d');
-
-    if (timelineChart) timelineChart.destroy();
 
     timelineChart = new Chart(ctx, {
         type: 'line',
@@ -563,8 +582,6 @@ function createTimelineChart(dates, turnovers) {
 
 function createPositionChart(dates, positionValues, cashValues) {
     const ctx = document.getElementById('position-chart').getContext('2d');
-
-    if (positionChart) positionChart.destroy();
 
     positionChart = new Chart(ctx, {
         type: 'line',
@@ -627,8 +644,6 @@ function createPositionChart(dates, positionValues, cashValues) {
 function createFrequencyChart(labels, data) {
     const ctx = document.getElementById('frequency-chart').getContext('2d');
 
-    if (frequencyChart) frequencyChart.destroy();
-
     frequencyChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -672,8 +687,6 @@ function createFrequencyChart(labels, data) {
 
 function createAmountChart(dates, buyAmounts, sellAmounts) {
     const ctx = document.getElementById('amount-chart').getContext('2d');
-
-    if (amountChart) amountChart.destroy();
 
     amountChart = new Chart(ctx, {
         type: 'line',
@@ -724,8 +737,6 @@ function createAmountChart(dates, buyAmounts, sellAmounts) {
 
 function createTurnoverChart(dates, turnovers) {
     const ctx = document.getElementById('turnover-chart').getContext('2d');
-
-    if (turnoverChart) turnoverChart.destroy();
 
     // 计算平均线
     const avgTurnover = turnovers.reduce((a, b) => a + b, 0) / turnovers.length;

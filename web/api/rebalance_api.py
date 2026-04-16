@@ -54,28 +54,33 @@ def get_rebalance_history(task_id: str) -> dict:
         if not events:
             exp_dir = qlib.get_experiment_dir(model_id)
             
-            rebalance_file = Path(exp_dir) / 'portfolio_analysis' / 'rebalance_history.pkl'
+            rebalance_file = Path(exp_dir)/'artifacts'/ 'portfolio_analysis' / 'rebalance_history.pkl'
             logger.info(f'Looking for rebalance history in {rebalance_file}')
             if rebalance_file.exists():
                 with open(rebalance_file, 'rb') as f:
                     history = pickle.load(f)
-                    events = [
-                        {
+                    events = []
+                    for e in history:
+                        # Convert numpy types to native Python types for JSON serialization
+                        buy_amounts = {k: float(v) for k, v in e.buy_amounts.items()}
+                        sell_amounts = {k: float(v) for k, v in e.sell_amounts.items()}
+                        position_before = {k: float(v) for k, v in e.position_before.items()}
+                        position_after = {k: float(v) for k, v in e.position_after.items()}
+
+                        events.append({
                             'date': e.date,
                             'trade_step': e.trade_step,
                             'stocks_to_buy': e.stocks_to_buy,
                             'stocks_to_sell': e.stocks_to_sell,
-                            'buy_amounts': e.buy_amounts,
-                            'sell_amounts': e.sell_amounts,
-                            'turnover': e.turnover,
-                            'cash_before': e.cash_before,
-                            'cash_after': e.cash_after,
-                            'total_value': e.total_value,
-                            'position_before': e.position_before,
-                            'position_after': e.position_after
-                        }
-                        for e in history
-                    ]
+                            'buy_amounts': buy_amounts,
+                            'sell_amounts': sell_amounts,
+                            'turnover': float(e.turnover),
+                            'cash_before': float(e.cash_before),
+                            'cash_after': float(e.cash_after),
+                            'total_value': float(e.total_value),
+                            'position_before': position_before,
+                            'position_after': position_after
+                        })
 
         # Apply filters
         if start_date:
@@ -108,8 +113,8 @@ def get_rebalance_history(task_id: str) -> dict:
             'min_turnover': 0,
             'total_buy_amount': 0,
             'total_sell_amount': 0
-            }
-
+            }    
+        logger.info(f'No rebalance events found for this experiment.{events[0:20]}')
         return {
             'success': True,
             'events': events,

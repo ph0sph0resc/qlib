@@ -449,6 +449,13 @@ class PortAnaRecord(ACRecordTemp):
         self.indicator_analysis_freq = [
             "{0}{1}".format(*Freq.parse(_analysis_freq)) for _analysis_freq in indicator_analysis_freq
         ]
+        # Enable rebalance history recording
+        try:
+            from qlib.backtest.rebalance_recorder import rebalance_recorder
+            rebalance_recorder.enable()
+            logger.info("Rebalance recorder enabled")
+        except ImportError:
+            logger.warning("rebalance_recorder module not available")
         self.indicator_analysis_method = indicator_analysis_method
 
     def _get_report_freq(self, executor_config):
@@ -547,10 +554,13 @@ class PortAnaRecord(ACRecordTemp):
                 pprint(analysis_df)
 
         # Save rebalance history if available
+
         try:
             from qlib.backtest.rebalance_recorder import rebalance_recorder
+            logger.info(f"Checking rebalance recorder for rebalance history...{rebalance_recorder.is_enabled()}")
             if rebalance_recorder.is_enabled():
                 rebalance_history = rebalance_recorder.get_history()
+                #logger.info(f"Rebalance history length: {rebalance_history}")
                 if rebalance_history:
                     artifact_objects.update({"rebalance_history.pkl": rebalance_history})
                     logger.info(

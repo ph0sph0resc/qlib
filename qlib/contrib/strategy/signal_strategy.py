@@ -137,6 +137,9 @@ class TopkDropoutStrategy(BaseSignalStrategy):
         self.only_tradable = only_tradable
         self.forbid_all_trade_at_limit = forbid_all_trade_at_limit
 
+        # Store last rebalance event data for updating position in post_exe_step
+        self._last_rebalance_event = None
+
     def generate_trade_decision(self, execute_result=None):
         # get the number of trading step finished, trade_step can be [0, 1, 2, ..., trade_len - 1]
         trade_step = self.trade_calendar.get_trade_step()
@@ -294,7 +297,87 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                 direction=Order.BUY,  # 1 for buy
             )
             buy_order_list.append(buy_order)
+
+        # Record rebalance event if enabled
+        try:
+            from qlib.backtest.rebalance_recorder import rebalance_recorder
+            if rebalance_recorder.is_enabled() and (sell_order_list or buy_order_list):
+                # Get position before trading
+                position_before = self.trade_position.get_stock_weight_dict(only_stock=False)
+                cash_before = self.trade_position.get_cash()
+
+                trade_date_str = trade_start_time.strftime("%Y-%m-%d")
+
+                # Calculate buy and sell amounts
+                buy_amounts = {order.stock_id: order.amount for order in buy_order_list}
+                sell_amounts = {order.stock_id: order.amount for order in sell_order_list}
+
+                # Calculate total value
+                total_value = cash_before + sum(position_before.values())
+
+                # Store rebalance event data for later update in post_exe_step
+                self._last_rebalance_event = {
+                    'date': trade_date_str,
+                    'trade_step': trade_step,
+                    'stocks_to_buy': [order.stock_id for order in buy_order_list],
+                    'stocks_to_sell': [order.stock_id for order in sell_order_list],
+                    'buy_amounts': buy_amounts,
+                    'sell_amounts': sell_amounts,
+                    'position_before': position_before,
+                    'cash_before': cash_before,
+                    'total_value': total_value
+                }
+            else:
+                self._last_rebalance_event = None
+        except ImportError:
+            # rebalance_recorder module not available, skip recording
+            self._last_rebalance_event = None
+        except Exception as e:
+            # Log any errors but don't break backtest
+            logger.warning(f"Failed to record rebalance: {e}")
+            self._last_rebalance_event = None
+
         return TradeDecisionWO(sell_order_list + buy_order_list, self)
+
+    def post_exe_step(self, execute_result=None):
+        """
+        Update rebalance record after trade execution.
+
+        This method is called after orders are executed, allowing us to capture
+        final position and cash after rebalancing.
+        """
+        if self._last_rebalance_event is not None:
+            try:
+                from qlib.backtest.rebalance_recorder import rebalance_recorder
+                if rebalance_recorder.is_enabled():
+                    # Get position after trading
+                    position_after = self.trade_position.get_stock_weight_dict(only_stock=False)
+                    cash_after = self.trade_position.get_cash()
+
+                    # Update the rebalance record with final values
+                    logger.info(f"Updating rebalance record for date {self._last_rebalance_event['date']} with post-execution data")
+                    rebalance_recorder.record_rebalance(
+                        date=self._last_rebalance_event['date'],
+                        trade_step=self._last_rebalance_event['trade_step'],
+                        stocks_to_buy=self._last_rebalance_event['stocks_to_buy'],
+                        stocks_to_sell=self._last_rebalance_event['stocks_to_sell'],
+                        buy_amounts=self._last_rebalance_event['buy_amounts'],
+                        sell_amounts=self._last_rebalance_event['sell_amounts'],
+                        position_before=self._last_rebalance_event['position_before'],
+                        position_after=position_after,
+                        cash_before=self._last_rebalance_event['cash_before'],
+                        cash_after=cash_after,
+                        total_value=self._last_rebalance_event['total_value']
+                    )
+            except ImportError:
+                # rebalance_recorder module not available, skip recording
+                pass
+            except Exception as e:
+                # Log any errors but don't break backtest
+                logger.warning(f"Failed to update rebalance record: {e}")
+
+        # Clear the last rebalance event
+        self._last_rebalance_event = None
 
 
 class WeightStrategyBase(BaseSignalStrategy):
@@ -352,6 +435,7 @@ class WeightStrategyBase(BaseSignalStrategy):
         # generate_target_weight_position() and generate_order_list_from_target_weight_position() to generate order_list
 
         # get the number of trading step finished, trade_step can be [0, 1, 2, ..., trade_len - 1]
+        logger.info(f"Generating trade decision for trade step {self.trade_calendar.get_trade_step()}...")
         trade_step = self.trade_calendar.get_trade_step()
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
         pred_start_time, pred_end_time = self.trade_calendar.get_step_time(trade_step, shift=1)
@@ -437,6 +521,7 @@ class WeightStrategyBase(BaseSignalStrategy):
         This method is called after orders are executed, allowing us to capture
         the final position and cash after rebalancing.
         """
+        logger.info("Post execution step: updating rebalance record if needed...")
         if self._last_rebalance_event is not None:
             try:
                 from qlib.backtest.rebalance_recorder import rebalance_recorder
@@ -446,6 +531,7 @@ class WeightStrategyBase(BaseSignalStrategy):
                     cash_after = self.trade_position.get_cash()
 
                     # Update the rebalance record with final values
+                    logger.info(f"Updating rebalance record for date {self._last_rebalance_event} with post-execution data")
                     rebalance_recorder.record_rebalance(
                         date=self._last_rebalance_event['date'],
                         trade_step=self._last_rebalance_event['trade_step'],

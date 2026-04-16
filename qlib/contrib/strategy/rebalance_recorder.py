@@ -56,7 +56,7 @@ class RebalanceRecorder:
     def __init__(self):
         """Initialize rebalance recorder."""
         self._history: List[RebalanceEvent] = []
-        self._enabled = False
+        self._enabled = True
 
     def enable(self):
         """Enable rebalance tracking."""
