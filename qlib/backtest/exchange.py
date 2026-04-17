@@ -772,6 +772,7 @@ class Exchange:
         factor : float, adjusted factor
         return : float, real amount
         """
+        #logger = get_module_logger("round_amount_by_trade_unit")
         if not self.trade_w_adj_price and self.trade_unit is not None:
             # the minimal amount is 1. Add 0.1 for solving precision problem.
             factor = self._get_factor_or_raise_error(
@@ -780,7 +781,9 @@ class Exchange:
                 start_time=start_time,
                 end_time=end_time,
             )
-            return (deal_amount * factor + 0.1) // self.trade_unit * self.trade_unit / factor
+            #logger.info(f"round_amount_by_trade_unit, deal_amount: {self.trade_unit}, deal_amount: {deal_amount}, stock_id: {stock_id}"   )
+
+            return (deal_amount * factor + 0.1) // self.trade_unit * self.trade_unit
         return deal_amount
 
     def _clip_amount_by_volume(self, order: Order, dealt_order_amount: dict) -> Optional[float]:

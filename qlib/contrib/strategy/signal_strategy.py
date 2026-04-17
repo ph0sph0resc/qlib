@@ -146,6 +146,8 @@ class TopkDropoutStrategy(BaseSignalStrategy):
         trade_start_time, trade_end_time = self.trade_calendar.get_step_time(trade_step)
         pred_start_time, pred_end_time = self.trade_calendar.get_step_time(trade_step, shift=1)
         pred_score = self.signal.get_signal(start_time=pred_start_time, end_time=pred_end_time)
+        buy_price_dict  ={}
+        sell_price_dict  ={}
         # NOTE: the current version of topk dropout strategy can't handle pd.DataFrame(multiple signal)
         # So it only leverage the first col of signal
         if isinstance(pred_score, pd.DataFrame):
@@ -263,6 +265,7 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                     trade_val, trade_cost, trade_price = self.trade_exchange.deal_order(
                         sell_order, position=current_temp
                     )
+                    sell_price_dict[code] = trade_price
                     # update cash
                     cash += trade_val - trade_cost
         # buy new stock
@@ -286,9 +289,12 @@ class TopkDropoutStrategy(BaseSignalStrategy):
             buy_price = self.trade_exchange.get_deal_price(
                 stock_id=code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.BUY
             )
+          
             buy_amount = value / buy_price
+            
             factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
             buy_amount = self.trade_exchange.round_amount_by_trade_unit(buy_amount, factor)
+            buy_price_dict[code] = buy_price/ factor
             buy_order = Order(
                 stock_id=code,
                 amount=buy_amount,
@@ -297,20 +303,31 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                 direction=Order.BUY,  # 1 for buy
             )
             buy_order_list.append(buy_order)
-
+        #logger.info(f"Generated {len(buy_order_list)} orders for trade step {buy_order_list}.")
         # Record rebalance event if enabled
         try:
             from qlib.backtest.rebalance_recorder import rebalance_recorder
             if rebalance_recorder.is_enabled() and (sell_order_list or buy_order_list):
-                # Get position before trading
-                position_before = self.trade_position.get_stock_weight_dict(only_stock=False)
+                # Get position before trading (using stock amounts, not weights)
+                position_before = self.trade_position.get_stock_amount_dict()
                 cash_before = self.trade_position.get_cash()
 
                 trade_date_str = trade_start_time.strftime("%Y-%m-%d")
 
-                # Calculate buy and sell amounts
-                buy_amounts = {order.stock_id: order.amount for order in buy_order_list}
-                sell_amounts = {order.stock_id: order.amount for order in sell_order_list}
+                # Calculate buy and sell amounts (shares, not monetary value)
+                buy_shares = {order.stock_id: order.amount for order in buy_order_list}
+                sell_shares = {order.stock_id: order.amount for order in sell_order_list}
+
+                # Calculate monetary value of trades (shares * price)
+                buy_amounts = {}
+                for order in buy_order_list:
+                    trade_price, _, _ = self.trade_exchange.deal_order(order, position=self.trade_position)
+                    buy_amounts[order.stock_id] = order.amount * buy_price_dict[order.stock_id]
+                    
+                sell_amounts = {}
+                for order in sell_order_list:
+                    trade_price, _, _ = self.trade_exchange.deal_order(order, position=self.trade_position)
+                    sell_amounts[order.stock_id] = order.amount * sell_price_dict[order.stock_id]
 
                 # Calculate total value
                 total_value = cash_before + sum(position_before.values())
@@ -321,6 +338,8 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                     'trade_step': trade_step,
                     'stocks_to_buy': [order.stock_id for order in buy_order_list],
                     'stocks_to_sell': [order.stock_id for order in sell_order_list],
+                    'buy_shares': buy_shares,
+                    'sell_shares': sell_shares,
                     'buy_amounts': buy_amounts,
                     'sell_amounts': sell_amounts,
                     'position_before': position_before,
@@ -350,16 +369,18 @@ class TopkDropoutStrategy(BaseSignalStrategy):
             try:
                 from qlib.backtest.rebalance_recorder import rebalance_recorder
                 if rebalance_recorder.is_enabled():
-                    # Get position after trading
-                    position_after = self.trade_position.get_stock_weight_dict(only_stock=False)
+                    # Get position after trading (using stock amounts, not weights)
+                    position_after = self.trade_position.get_stock_amount_dict()
                     cash_after = self.trade_position.get_cash()
 
                     # Update the rebalance record with final values
-                    logger.info(f"Updating rebalance record for date {self._last_rebalance_event['date']} with post-execution data")
+                    #logger.info(f"Updating rebalance record for date {self._last_rebalance_event['date']} with post-execution data")
                     rebalance_recorder.record_rebalance(
                         date=self._last_rebalance_event['date'],
+                        buy_shares=self._last_rebalance_event['buy_shares'],
                         trade_step=self._last_rebalance_event['trade_step'],
                         stocks_to_buy=self._last_rebalance_event['stocks_to_buy'],
+                        sell_shares=self._last_rebalance_event['sell_shares'],
                         stocks_to_sell=self._last_rebalance_event['stocks_to_sell'],
                         buy_amounts=self._last_rebalance_event['buy_amounts'],
                         sell_amounts=self._last_rebalance_event['sell_amounts'],
@@ -458,13 +479,13 @@ class WeightStrategyBase(BaseSignalStrategy):
             trade_start_time=trade_start_time,
             trade_end_time=trade_end_time,
         )
-
+        logger.info(f"Generated {len(order_list)} orders for trade step {trade_step}.")
         # Record rebalance event if enabled
         try:
             from qlib.backtest.rebalance_recorder import rebalance_recorder
             if rebalance_recorder.is_enabled() and order_list:
-                # Get position before trading
-                position_before = self.trade_position.get_stock_weight_dict(only_stock=False)
+                # Get position before trading (using stock amounts, not weights)
+                position_before = self.trade_position.get_stock_amount_dict()
                 cash_before = self.trade_position.get_cash()
 
                 # Separate buy and sell orders
@@ -478,11 +499,18 @@ class WeightStrategyBase(BaseSignalStrategy):
 
                 # Only record if there are actual trades
                 if buy_orders or sell_orders:
-                    trade_date_str = trade_start_time.strftime("%Y-%m-%d")
+                    trade_date_str = trade_start_time.strftime.strftime("%Y-%m-%d")
 
-                    # Calculate buy and sell amounts
-                    buy_amounts = {order.stock_id: order.amount for order in buy_orders}
-                    sell_amounts = {order.stock_id: order.amount for order in sell_orders}
+                    # Calculate buy and sell amounts in monetary value (shares * price)
+                    buy_amounts = {}
+                    for order in buy_orders:
+                        trade_price, _, _ = self.trade_exchange.deal_order(order, position=self.trade_position)
+                        buy_amounts[order.stock_id] = order.amount * trade_price
+
+                    sell_amounts = {}
+                    for order in sell_orders:
+                        trade_price, _, _ = self.trade_exchange.deal_order(order, position=self.trade_position)
+                        sell_amounts[order.stock_id] = order.amount * trade_price
 
                     # Calculate total value
                     total_value = cash_before + sum(position_before.values())
@@ -521,17 +549,17 @@ class WeightStrategyBase(BaseSignalStrategy):
         This method is called after orders are executed, allowing us to capture
         the final position and cash after rebalancing.
         """
-        logger.info("Post execution step: updating rebalance record if needed...")
+        #logger.info("Post execution step: updating rebalance record if needed...")
         if self._last_rebalance_event is not None:
             try:
                 from qlib.backtest.rebalance_recorder import rebalance_recorder
                 if rebalance_recorder.is_enabled():
-                    # Get position after trading
-                    position_after = self.trade_position.get_stock_weight_dict(only_stock=False)
+                    # Get position after trading (using stock amounts, not weights)
+                    position_after = self.trade_position.get_stock_amount_dict()
                     cash_after = self.trade_position.get_cash()
 
                     # Update the rebalance record with final values
-                    logger.info(f"Updating rebalance record for date {self._last_rebalance_event} with post-execution data")
+                    #logger.info(f"Updating rebalance record for date {self._last_rebalance_event} with post-execution data")
                     rebalance_recorder.record_rebalance(
                         date=self._last_rebalance_event['date'],
                         trade_step=self._last_rebalance_event['trade_step'],

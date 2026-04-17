@@ -33,6 +33,15 @@ dataset = D.features(
     freq="day"
 )
 
+df = D.features(
+    ["SZ300003"],
+    ["$open", "$high", "$low", "$close", "$factor"],
+    start_time="2026-01-01",
+    end_time="2026-02-28",
+)
+print(df)
+
+
 # 分割数据
 train_df = dataset.prepare("2020-01-01", col_set=["feature", "label"], data_key="infer")
 test_df = dataset.prepare("2023-01-01", col_set=["feature", "label"], data_key="infer")

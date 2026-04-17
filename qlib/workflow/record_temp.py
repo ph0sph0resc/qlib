@@ -421,6 +421,7 @@ class PortAnaRecord(ACRecordTemp):
         config = deepcopy_basic_type(config)
 
         self.strategy_config = config["strategy"]
+        #logger.info(f"Strategy config0: {self.strategy_config}")
         _default_executor_config = {
             "class": "SimulatorExecutor",
             "module_path": "qlib.backtest.executor",

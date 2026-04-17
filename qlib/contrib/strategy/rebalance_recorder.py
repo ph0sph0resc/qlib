@@ -6,7 +6,7 @@ Rebalance Recorder for tracking portfolio rebalance events
 This module provides thread-safe functionality to record when and how a strategy
 rebalances its portfolio, including details about stocks bought, sold, and their weights.
 """
-from typing import Dict, List, Optional
+from typing import Dict, List
 from datetime import datetime
 from threading import Lock
 
@@ -18,23 +18,33 @@ class RebalanceEvent:
         self,
         date: str,
         trade_step: int,
-        buy_orders: List[Dict],
-        sell_orders: List[Dict],
+        stocks_to_buy: List[str],
+        stocks_to_sell: List[str],
+        buy_shares: Dict[str, float],
+        sell_shares: Dict[str, float],
+        buy_amounts: Dict[str, float],
+        sell_amounts: Dict[str, float],
         position_before: Dict[str, float],
         position_after: Dict[str, float],
         cash_before: float,
         cash_after: float,
-        total_value: float
+        total_value: float,
+        turnover: float = 0.0
     ):
         self.date = date
         self.trade_step = trade_step
-        self.buy_orders = buy_orders
-        self.sell_orders = sell_orders
+        self.stocks_to_buy = stocks_to_buy
+        self.stocks_to_sell = stocks_to_sell
+        self.buy_shares  = buy_shares
+        self.sell_shares = sell_shares
+        self.buy_amounts = buy_amounts
+        self.sell_amounts = sell_amounts
         self.position_before = position_before
         self.position_after = position_after
         self.cash_before = cash_before
         self.cash_after = cash_after
         self.total_value = total_value
+        self.turnover = turnover
 
 
 class RebalanceRecorder:
@@ -79,13 +89,18 @@ class RebalanceRecorder:
         self,
         date: str,
         trade_step: int,
-        buy_orders: List[Dict],
-        sell_orders: List[Dict],
+        stocks_to_buy: List[str],
+        stocks_to_sell: List[str],
+        buy_shares: Dict[str, float],
+        sell_shares: Dict[str, float],
+        buy_amounts: Dict[str, float],
+        sell_amounts: Dict[str, float],
         position_before: Dict[str, float],
         position_after: Dict[str, float],
         cash_before: float,
         cash_after: float,
-        total_value: float
+        total_value: float,
+        turnover: float = None
     ) -> None:
         """
         Record a rebalance event.
@@ -96,39 +111,55 @@ class RebalanceRecorder:
             The trading date
         trade_step : int
             The trading step number
-        buy_orders : List[Dict]
-            List of buy orders in this rebalance
-        sell_orders : List[Dict]
-            List of sell orders in this rebalance
+        stocks_to_buy : List[str]
+            List of stock codes to buy
+        stocks_to_sell : List[str]
+            List of stock codes to sell
+        buy_shares : Dict[str, float]
+            Dictionary of stock code -> buy shares
+        sell_shares : Dict[str, float]
+            Dictionary of stock code -> sell shares
+        buy_amounts : Dict[str, float]
+            Dictionary of stock code -> buy amount (shares * price)
+        sell_amounts : Dict[str, float]
+            Dictionary of stock code -> sell amount (shares * price)
         position_before : Dict[str, float]
-            Position snapshot before rebalancing
+            Position snapshot before rebalancing (stock amounts)
         position_after : Dict[str, float]
-            Position snapshot after rebalancing
+            Position snapshot after rebalancing (stock amounts)
         cash_before : float
             Cash amount before rebalancing
         cash_after : float
             Cash amount after rebalancing
         total_value : float
             Total portfolio value after rebalancing
+        turnover : float, optional
+            Pre-calculated turnover value. If not provided, will be calculated.
         """
         if not self._enabled:
             return
 
-        # Calculate turnover
-        buy_value = sum(order.get('amount', 0) for order in buy_orders)
-        sell_value = sum(order.get('amount', 0) for order in sell_orders
-        turnover = (buy_value + sell_value) / 2
+        # Calculate turnover if not provided
+        if turnover is None:
+            buy_value = sum(buy_amounts.values())
+            sell_value = sum(sell_amounts.values())
+            turnover = (buy_value + sell_value) / 2
 
         event = RebalanceEvent(
             date=date,
             trade_step=trade_step,
-            buy_orders=buy_orders,
-            sell_orders=sell_orders,
+            stocks_to_buy=stocks_to_buy,
+            stocks_to_sell=stocks_to_sell,
+            buy_shares=buy_shares,
+            sell_shares=sell_shares,
+            buy_amounts=buy_amounts,
+            sell_amounts=sell_amounts,
             position_before=position_before,
             position_after=position_after,
             cash_before=cash_before,
             cash_after=cash_after,
-            total_value=total_value
+            total_value=total_value,
+            turnover=turnover
         )
 
         with self._lock:
