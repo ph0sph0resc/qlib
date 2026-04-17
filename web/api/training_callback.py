@@ -17,7 +17,7 @@ class TrainingProgressTracker:
     based on the total number of expected iterations.
     """
 
-    def __init__(self, total_epochs:预估int = 100):
+    def __init__(self, total_epochs: int = 100):
         """
         Initialize the progress tracker
 
