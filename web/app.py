@@ -463,8 +463,11 @@ def internal_error(error):
 def api_rebalance_history():
     """Get rebalance history for a backtest task"""
     logger.info(f'api_rebalance_history called with task_id={request.args.get("task_id")}')
-    return jsonify(rebalance_api.get_rebalance_history(request.args.get('task_id')))
-
+    
+    data = jsonify(rebalance_api.get_rebalance_history(request.args.get('task_id')))
+    #with open('rebalance_history_debug.log', 'a') as f:
+    #    f.write(data.get_data(as_text=True) + '\n')
+    return data
 
 
 

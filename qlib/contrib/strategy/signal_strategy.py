@@ -333,9 +333,13 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                 for sub_code, amount in position_before.items():
                     price = self.trade_exchange.get_deal_price(
                     stock_id=sub_code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.SELL)
-                    factor = self.trade_exchange.get_factor(stock_id=sub_code, start_time=trade_start_time, end_time=trade_end_time)
+                    #factor = self.trade_exchange.get_factor(stock_id=sub_code, start_time=trade_start_time, end_time=trade_end_time)
+                    if price is None  or np.isnan(price):
+                        price = 2   
+                        logger.warning(f"Price for stock {sub_code} is not available at {price}. Setting price to 0.")
+
                     position_before[sub_code] = amount * price
-                    logger.info(f"Calculating total value, stock_id: {sub_code}, factor: {factor}, amount: {amount}, price: {price}, value: {position_before[sub_code]}")
+                    #logger.info(f"Calculating total value, stock_id: {sub_code}, factor: {factor}, amount: {amount}, price: {price}, value: {position_before[sub_code]}")
 
                 total_value = cash_before + sum(position_before.values())
 
