@@ -114,7 +114,7 @@ def get_rebalance_history(task_id: str) -> dict:
             'total_buy_amount': 0,
             'total_sell_amount': 0
             }    
-        logger.info(f'No rebalance events found for this experiment.{events[0:1]}')
+        logger.info(f'No rebalance events found for this experiment.{events[0:3]}')
         return {
             'success': True,
             'events': events,

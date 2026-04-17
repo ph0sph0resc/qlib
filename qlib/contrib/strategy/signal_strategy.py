@@ -294,7 +294,7 @@ class TopkDropoutStrategy(BaseSignalStrategy):
             
             factor = self.trade_exchange.get_factor(stock_id=code, start_time=trade_start_time, end_time=trade_end_time)
             buy_amount = self.trade_exchange.round_amount_by_trade_unit(buy_amount, factor)
-            buy_price_dict[code] = buy_price/ factor
+            buy_price_dict[code] = buy_price
             buy_order = Order(
                 stock_id=code,
                 amount=buy_amount,
@@ -330,6 +330,13 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                     sell_amounts[order.stock_id] = order.amount * sell_price_dict[order.stock_id]
 
                 # Calculate total value
+                for sub_code, amount in position_before.items():
+                    price = self.trade_exchange.get_deal_price(
+                    stock_id=sub_code, start_time=trade_start_time, end_time=trade_end_time, direction=OrderDir.SELL)
+                    factor = self.trade_exchange.get_factor(stock_id=sub_code, start_time=trade_start_time, end_time=trade_end_time)
+                    position_before[sub_code] = amount * price
+                    logger.info(f"Calculating total value, stock_id: {sub_code}, factor: {factor}, amount: {amount}, price: {price}, value: {position_before[sub_code]}")
+
                 total_value = cash_before + sum(position_before.values())
 
                 # Store rebalance event data for later update in post_exe_step
@@ -374,7 +381,7 @@ class TopkDropoutStrategy(BaseSignalStrategy):
                     cash_after = self.trade_position.get_cash()
 
                     # Update the rebalance record with final values
-                    #logger.info(f"Updating rebalance record for date {self._last_rebalance_event['date']} with post-execution data")
+                    
                     rebalance_recorder.record_rebalance(
                         date=self._last_rebalance_event['date'],
                         buy_shares=self._last_rebalance_event['buy_shares'],
@@ -559,7 +566,7 @@ class WeightStrategyBase(BaseSignalStrategy):
                     cash_after = self.trade_position.get_cash()
 
                     # Update the rebalance record with final values
-                    #logger.info(f"Updating rebalance record for date {self._last_rebalance_event} with post-execution data")
+                    logger.info(f"Updating rebalance record for cash_after {cash_after} with post-execution data")
                     rebalance_recorder.record_rebalance(
                         date=self._last_rebalance_event['date'],
                         trade_step=self._last_rebalance_event['trade_step'],
