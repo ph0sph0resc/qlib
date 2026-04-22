@@ -187,16 +187,28 @@ function displayFactorResults(results) {
     }
 
     // 更新IC时间序列图表
-    if (results.ic_values) {
-        const dates = results.dates || Array.from({length: results.ic_values.length}, (_, i) => `Month ${i + 1}`);
-        createLineChart('ic-chart', dates, [{
+    if (results.ic_values && results.ic_values.length > 0) {
+        const dates = results.dates || Array.from({length: results.ic_values.length}, (_, i) => `Day ${i + 1}`);
+        const datasets = [{
             label: 'IC值',
             data: results.ic_values,
             borderColor: 'rgb(75, 192, 192)',
             backgroundColor: 'rgba(75, 192, 192, 0.1)',
             fill: false,
             tension: 0.1
-        }]);
+        }];
+        // Add Rank IC if available
+        if (results.rank_ic_values && results.rank_ic_values.length === results.ic_values.length) {
+            datasets.push({
+                label: 'Rank IC值',
+                data: results.rank_ic_values,
+                borderColor: 'rgb(255, 159, 64)',
+                backgroundColor: 'rgba(255, 159, 64, 0.1)',
+                fill: false,
+                tension: 0.1
+            });
+        }
+        createLineChart('ic-chart', dates, datasets);
 
         // 更新IC分布
         if (results.ic_distribution) {
@@ -204,31 +216,32 @@ function displayFactorResults(results) {
         }
 
         // 更新分组收益
-        if (results.group_returns) {
-            createBarChart('group-return-chart', ['第1组', '第2组', '第3组', '第4组', '第5组'], [{
+        if (results.group_returns && results.group_returns.length > 0) {
+            const nGroups = results.group_returns.length;
+            const groupLabels = Array.from({length: nGroups}, (_, i) => `第${i + 1}组`);
+            const bgColors = [
+                'rgba(255, 99, 132, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 206, 86, 0.6)',
+                'rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(153, 102, 255, 0.6)',
+                'rgba(255, 99, 132, 0.6)', 'rgba(201, 203, 207, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(255, 159, 64, 0.6)'
+            ];
+            const bdColors = bgColors.map(c => c.replace('0.6)', '1)'));
+            createBarChart('group-return-chart', groupLabels, [{
                 label: '分组收益 (%)',
                 data: results.group_returns,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.6)',
-                    'rgba(255, 159, 64, 0.6)',
-                    'rgba(255, 206, 86, 0.6)',
-                    'rgba(75, 192, 192, 0.6)',
-                    'rgba(54, 162, 235, 0.6)'
-                ],
-                borderColor: [
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(255, 159, 64, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(54, 162, 235, 1)'
-                ],
+                backgroundColor: bgColors.slice(0, nGroups),
+                borderColor: bdColors.slice(0, nGroups),
                 borderWidth: 1
             }]);
         }
     }
 
-    showAlert('因子分析结果：IC均值=' + formatNumber(results.ic_mean || 0, 4) +
-               ', IC标准差=' + formatNumber(results.ic_std || 0, 4), 'success');
+    // Display summary with all key metrics
+    const parts = ['IC均值=' + formatNumber(results.ic_mean || 0, 4),
+                   'Rank IC均值=' + formatNumber(results.rank_ic_mean || 0, 4)];
+    if (results.icir !== undefined) {
+        parts.push('ICIR=' + formatNumber(results.icir, 4));
+    }
+    showAlert('因子分析结果：' + parts.join(', '), 'success');
 }
 </script>
 {% endblock %}

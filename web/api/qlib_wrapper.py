@@ -94,7 +94,7 @@ class QLibWrapper:
         try:
             from qlib.data import D
             region = region or self.region
-            return D.instruments(market=market, as_list=True, region=region)
+            return D.instruments(market=market)
         except Exception as e:
             logger.error(f'Failed to get instruments: {e}')
             return []
@@ -147,49 +147,154 @@ class QLibWrapper:
 
     def run_factor_analysis(self, config: Dict, task=None) -> Dict:
         """
-        Run factor analysis
+        Run factor analysis using real QLib data
 
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary with keys:
+                - qlib_init: {provider_uri, region}
+                - market: stock pool (csi300, csi500, all)
+                - data_handler_config: {start_time, end_time, instruments}
+                - factor_analysis: {expression, alpha_factors}
             task: Task object for progress updates
 
         Returns:
-            Analysis results
+            Analysis results dict
         """
+        # Extract configuration
+        qlib_init_config = config.get('qlib_init', {})
+        market = config.get('market', config.get('data_handler_config', {}).get('instruments', 'csi300'))
+        handler_config = config.get('data_handler_config', {})
+        factor_config = config.get('factor_analysis', {})
+
+        start_time = handler_config.get('start_time', '2018-01-01')
+        end_time = handler_config.get('end_time', '2020-12-31')
+        factor_expression = factor_config.get('expression', '$close')
+
+        # Set provider_uri if specified
+        if 'provider_uri' in qlib_init_config:
+            self.provider_uri = qlib_init_config['provider_uri']
+        if 'region' in qlib_init_config:
+            self.region = qlib_init_config['region']
+
         if task:
             task.update_progress(10, 'Initializing QLib')
 
         if not self._initialized:
-            self.init()
+            if not self.init():
+                raise RuntimeError('Failed to initialize QLib')
 
         try:
-            from qlib.workflow import R
-            from qlib.workflow.record_temp import SignalRecord, SigAnaRecord
+            from qlib.data import D
+            from qlib.contrib.eva.alpha import calc_ic, calc_long_short_return
 
             if task:
-                task.update_progress(30, 'Loading data')
+                task.update_progress(20, 'Loading instruments')
 
-            # Load data handler
-            # This is a simplified version - actual implementation would
-            # need to be more robust based on config structure
+            instruments = D.instruments(market=market)
+            if not instruments:
+                raise ValueError(f'No instruments found for market: {market}')
+            logger.info(f'Loaded {len(instruments)} instruments for market {market}')
 
             if task:
-                task.update_progress(60, 'Computing factor analysis')
+                task.update_progress(35, 'Computing factor values')
 
-            # Perform factor analysis
-            # Return mock results for now
+            # Compute factor values
+            factor_fields = [factor_expression]
+            factor_data = D.features(instruments, factor_fields, start_time=start_time, end_time=end_time)
+            if factor_data is None or factor_data.empty:
+                raise ValueError(f'No factor data returned for expression: {factor_expression}')
+            pred = factor_data.iloc[:, 0].dropna()
+            logger.info(f'Factor data shape: {factor_data.shape}, valid: {len(pred)}')
+
+            if task:
+                task.update_progress(50, 'Computing label (future returns)')
+
+            # Compute label: future return Ref($close, -1)/$close - 1
+            label_fields = ['Ref($close, -1)/$close - 1']
+            label_data = D.features(instruments, label_fields, start_time=start_time, end_time=end_time)
+            if label_data is None or label_data.empty:
+                raise ValueError('No label data returned')
+            label = label_data.iloc[:, 0].dropna()
+            logger.info(f'Label data shape: {label_data.shape}, valid: {len(label)}')
+
+            if task:
+                task.update_progress(65, 'Aligning data and computing IC')
+
+            # Align pred and label
+            common_index = pred.index.intersection(label.index)
+            if len(common_index) == 0:
+                raise ValueError('No overlapping data between factor and label')
+            pred = pred.loc[common_index]
+            label = label.loc[common_index]
+            logger.info(f'Aligned data: {len(pred)} samples')
+
+            # Calculate IC and Rank IC
+            ic_series, rank_ic_series = calc_ic(pred, label, date_col='datetime', dropna=True)
+            logger.info(f'IC series length: {len(ic_series)}, Rank IC series length: {len(rank_ic_series)}')
+
+            if task:
+                task.update_progress(80, 'Computing long-short returns and group analysis')
+
+            # Calculate long-short returns
+            long_short_r, long_avg_r = calc_long_short_return(pred, label, date_col='datetime', quantile=0.2)
+
+            # Calculate 5-group returns
+            df = pd.DataFrame({'pred': pred, 'label': label})
+            group = df.groupby(level='datetime', group_keys=False)
+            n_groups = 5
+            group_returns = []
+            for i in range(n_groups):
+                quantile_low = i / n_groups
+                quantile_high = (i + 1) / n_groups
+
+                def calc_group_return(x, ql=quantile_low, qh=quantile_high):
+                    low = x['pred'].quantile(ql)
+                    high = x['pred'].quantile(qh)
+                    mask = (x['pred'] >= low) & (x['pred'] <= high)
+                    if mask.sum() == 0:
+                        return np.nan
+                    return x.loc[mask, 'label'].mean()
+
+                g_return = group.apply(calc_group_return).mean()
+                group_returns.append(float(g_return) if not pd.isna(g_return) else 0.0)
+
+            # Compute turnover from long-short returns
+            if len(long_short_r) > 1:
+                daily_turnover = long_short_r.diff().abs().mean()
+                turnover = float(daily_turnover) if not pd.isna(daily_turnover) else 0.0
+            else:
+                turnover = 0.0
+
+            # Convert numpy types for JSON serialization
+            def to_python_float(v):
+                if isinstance(v, (np.floating, np.integer)):
+                    return float(v)
+                return float(v) if not pd.isna(v) else 0.0
+
+            # Build results
             results = {
-                'ic_mean': 0.05,
-                'ic_std': 0.2,
-                'rank_ic_mean': 0.06,
-                'rank_ic_std': 0.18,
-                'ic_groups': [0.01, 0.03, 0.05, 0.07, 0.09],
-                'turnover': 0.3
+                'ic_mean': to_python_float(ic_series.mean()),
+                'ic_std': to_python_float(ic_series.std()),
+                'rank_ic_mean': to_python_float(rank_ic_series.mean()),
+                'rank_ic_std': to_python_float(rank_ic_series.std()),
+                'icir': to_python_float(ic_series.mean() / ic_series.std()) if ic_series.std() > 0 else 0.0,
+                'turnover': turnover,
+                'ic_values': [to_python_float(v) for v in ic_series.values],
+                'dates': [str(d.date()) if hasattr(d, 'date') else str(d) for d in ic_series.index],
+                'ic_distribution': [to_python_float(v) for v in ic_series.values],
+                'rank_ic_values': [to_python_float(v) for v in rank_ic_series.values],
+                'group_returns': group_returns,
+                'long_short_returns': [to_python_float(v) for v in long_short_r.values],
             }
 
             if task:
                 task.update_progress(100, 'Factor analysis completed')
 
+            logger.info(
+                f'Factor analysis done: IC_mean={results["ic_mean"]:.4f}, '
+                f'Rank_IC_mean={results["rank_ic_mean"]:.4f}, '
+                f'ICIR={results["icir"]:.4f}'
+            )
             return results
 
         except Exception as e:

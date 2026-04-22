@@ -366,47 +366,9 @@ function destroyAllCharts() {
  * Initialize factor test charts with demo data
  */
 function initFactorTestCharts() {
-    // IC time series
-    createLineChart('ic-chart',
-        ['2018-01', '2018-02', '2018-03', '2018-04', '2018-05', '2018-06', '2018-07', '2018-08', '2018-09', '2018-10', '2018-11', '2018-12'],
-        [{
-            label: 'IC值',
-            data: [0.05, 0.03, 0.06, -0.02, 0.04, 0.07, 0.02, 0.05, 0.03, 0.04, 0.06, 0.05],
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-            fill: false,
-            tension: 0.1
-        }]
-    );
-
-    // IC distribution
-    createHistogramChart('ic-dist-chart',
-        [0.05, 0.03, 0.06, -0.02, 0.04, 0.07, 0.02, 0.05, 0.03, 0.04, 0.06, 0.05, 0.01, 0.08, -0.01, 0.03, 0.05, 0.02, 0.04, 0.06]
-    );
-
-    // Group returns
-    createBarChart('group-return-chart',
-        ['第1组', '第2组', '第3组', '第4组', '第5组'],
-        [{
-            label: '分组收益 (%)',
-            data: [-1.2, 0.5, 1.8, 2.5, 3.2],
-            backgroundColor: [
-                'rgba(255, 99, 132, 0.6)',
-                'rgba(255, 159, 64, 0.6)',
-                'rgba(255, 206, 86, 0.6)',
-                'rgba(75, 192, 192, 0.6)',
-                'rgba(54, 162, 235, 0.6)'
-            ],
-            borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(255, 159, 64, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(54, 162, 235, 1)'
-            ],
-            borderWidth: 1
-        }]
-    );
+    showEmptyChartState('ic-chart', '等待因子分析数据...');
+    showEmptyChartState('ic-dist-chart', '等待因子分析数据...');
+    showEmptyChartState('group-return-chart', '等待因子分析数据...');
 }
 
 /**
